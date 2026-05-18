@@ -1,0 +1,356 @@
+{
+  "app_name": "QuickBite",
+  "app_type": "food delivery app",
+  "platform": "flutter_cross_platform",
+  "summary": "A food delivery app connecting customers with local restaurants, featuring real-time order tracking and seamless payments.",
+  "tagline": "Hot food, fast delivery.",
+  "target_users": ["hungry customers", "restaurant owners", "delivery drivers"],
+  "user_roles": ["customer", "restaurant_admin", "driver", "super_admin"],
+
+  "features": [
+    {
+      "module": "authentication",
+      "priority": "mvp",
+      "complexity": "low",
+      "items": [
+        { "name": "email_password_login", "description": "Login with email and password", "user_roles": ["customer", "driver", "restaurant_admin"], "depends_on": [] },
+        { "name": "google_sign_in",       "description": "One-tap Google login",         "user_roles": ["customer"], "depends_on": [] },
+        { "name": "forgot_password",      "description": "Reset password via email",     "user_roles": ["customer", "driver"], "depends_on": ["email_password_login"] }
+      ]
+    },
+    {
+      "module": "restaurant_discovery",
+      "priority": "mvp",
+      "complexity": "medium",
+      "items": [
+        { "name": "browse_restaurants",  "description": "Browse nearby restaurants by category", "user_roles": ["customer"], "depends_on": [] },
+        { "name": "search_restaurants",  "description": "Search restaurants and dishes",        "user_roles": ["customer"], "depends_on": [] },
+        { "name": "restaurant_detail",   "description": "View menu, photos, reviews",           "user_roles": ["customer"], "depends_on": ["browse_restaurants"] }
+      ]
+    },
+    {
+      "module": "cart_and_checkout",
+      "priority": "mvp",
+      "complexity": "medium",
+      "items": [
+        { "name": "add_to_cart",         "description": "Add items to cart with customizations", "user_roles": ["customer"], "depends_on": ["restaurant_detail"] },
+        { "name": "checkout",            "description": "Review cart and place order",           "user_roles": ["customer"], "depends_on": ["add_to_cart"] },
+        { "name": "payment",             "description": "Pay via card or wallet",               "user_roles": ["customer"], "depends_on": ["checkout"] }
+      ]
+    },
+    {
+      "module": "order_tracking",
+      "priority": "mvp",
+      "complexity": "high",
+      "items": [
+        { "name": "live_order_tracking", "description": "Real-time map tracking of the driver", "user_roles": ["customer"], "depends_on": ["payment"] },
+        { "name": "order_history",       "description": "View past orders and reorder",         "user_roles": ["customer"], "depends_on": [] },
+        { "name": "order_rating",        "description": "Rate food and delivery experience",    "user_roles": ["customer"], "depends_on": ["live_order_tracking"] }
+      ]
+    }
+  ],
+
+  "mvp_features": ["email_password_login", "browse_restaurants", "add_to_cart", "checkout", "payment", "live_order_tracking"],
+  "post_mvp_features": ["google_sign_in", "order_rating", "loyalty_points", "scheduled_delivery"],
+
+  "screens": [
+    { "name": "SplashScreen",          "route": "/splash",         "purpose": "App launch screen with logo animation",           "user_roles": ["all"],              "is_protected": false, "widgets": [], "bottom_sheets": [], "dialogs": [], "state_needed": [], "api_calls": [], "notes": "Navigate to onboarding or home after 2s" },
+    { "name": "OnboardingScreen",      "route": "/onboarding",     "purpose": "3-slide value proposition for new users",         "user_roles": ["customer"],         "is_protected": false, "widgets": [], "bottom_sheets": [], "dialogs": [], "state_needed": [], "api_calls": [], "notes": "" },
+    { "name": "LoginScreen",           "route": "/login",          "purpose": "Email+password and Google login",                 "user_roles": ["all"],              "is_protected": false, "widgets": ["PrimaryButton", "GoogleSignInButton"], "bottom_sheets": [], "dialogs": [], "state_needed": ["AuthProvider"], "api_calls": ["POST /api/v1/auth/login"], "notes": "" },
+    { "name": "SignupScreen",          "route": "/signup",         "purpose": "New customer registration",                      "user_roles": ["customer"],         "is_protected": false, "widgets": ["PrimaryButton", "FormField"], "bottom_sheets": [], "dialogs": [], "state_needed": ["AuthProvider"], "api_calls": ["POST /api/v1/auth/register"], "notes": "" },
+    { "name": "HomeScreen",            "route": "/home",           "purpose": "Restaurant discovery, banners, categories",       "user_roles": ["customer"],         "is_protected": true,  "widgets": ["RestaurantCard", "CategoryChip", "SearchBar", "BannerCarousel"], "bottom_sheets": [], "dialogs": [], "state_needed": ["RestaurantProvider"], "api_calls": ["GET /api/v1/restaurants"], "notes": "" },
+    { "name": "RestaurantDetailScreen","route": "/restaurant/:id", "purpose": "Menu items, photos, hours, reviews",             "user_roles": ["customer"],         "is_protected": true,  "widgets": ["MenuItemCard", "RatingBar"], "bottom_sheets": ["AddToCartBottomSheet"], "dialogs": [], "state_needed": ["CartProvider", "RestaurantProvider"], "api_calls": ["GET /api/v1/restaurants/:id", "GET /api/v1/restaurants/:id/menu"], "notes": "" },
+    { "name": "CartScreen",            "route": "/cart",           "purpose": "Review cart, edit quantities, apply coupons",    "user_roles": ["customer"],         "is_protected": true,  "widgets": ["CartItemTile", "PriceSummaryCard"], "bottom_sheets": [], "dialogs": ["ClearCartDialog"], "state_needed": ["CartProvider"], "api_calls": [], "notes": "" },
+    { "name": "CheckoutScreen",        "route": "/checkout",       "purpose": "Delivery address, time slot, payment method",    "user_roles": ["customer"],         "is_protected": true,  "widgets": ["AddressSelector", "PaymentMethodCard"], "bottom_sheets": ["AddAddressBottomSheet"], "dialogs": [], "state_needed": ["CartProvider", "OrderProvider"], "api_calls": ["POST /api/v1/orders"], "notes": "" },
+    { "name": "OrderTrackingScreen",   "route": "/order/:id/track","purpose": "Live map with driver location + order status",   "user_roles": ["customer"],         "is_protected": true,  "widgets": ["MapWidget", "OrderStatusStepper"], "bottom_sheets": [], "dialogs": [], "state_needed": ["OrderProvider"], "api_calls": ["GET /api/v1/orders/:id", "WS /ws/orders/:id/location"], "notes": "Requires Google Maps SDK" },
+    { "name": "OrderHistoryScreen",    "route": "/orders",         "purpose": "List of past orders with status + reorder CTA",  "user_roles": ["customer"],         "is_protected": true,  "widgets": ["OrderHistoryTile"], "bottom_sheets": [], "dialogs": [], "state_needed": ["OrderProvider"], "api_calls": ["GET /api/v1/orders"], "notes": "" },
+    { "name": "ProfileScreen",         "route": "/profile",        "purpose": "User info, saved addresses, preferences",        "user_roles": ["customer"],         "is_protected": true,  "widgets": [], "bottom_sheets": [], "dialogs": ["LogoutDialog"], "state_needed": ["AuthProvider"], "api_calls": ["GET /api/v1/profile"], "notes": "" },
+    { "name": "ErrorScreen",           "route": "/error",          "purpose": "Catch-all error and empty state screen",         "user_roles": ["all"],              "is_protected": false, "widgets": ["ErrorIllustration"], "bottom_sheets": [], "dialogs": [], "state_needed": [], "api_calls": [], "notes": "" }
+  ],
+
+  "navigation": {
+    "nav_type": "bottom_navigation",
+    "bottom_tabs": [
+      { "label": "Home",    "icon": "home_outlined",         "route": "/home" },
+      { "label": "Cart",    "icon": "shopping_cart_outlined","route": "/cart" },
+      { "label": "Orders",  "icon": "receipt_long_outlined", "route": "/orders" },
+      { "label": "Profile", "icon": "person_outline",        "route": "/profile" }
+    ],
+    "routes": [
+      { "path": "/splash",          "screen": "SplashScreen",           "protected": false, "params": [] },
+      { "path": "/onboarding",      "screen": "OnboardingScreen",        "protected": false, "params": [] },
+      { "path": "/login",           "screen": "LoginScreen",            "protected": false, "params": [] },
+      { "path": "/signup",          "screen": "SignupScreen",           "protected": false, "params": [] },
+      { "path": "/home",            "screen": "HomeScreen",             "protected": true,  "params": [] },
+      { "path": "/restaurant/:id",  "screen": "RestaurantDetailScreen", "protected": true,  "params": ["id"] },
+      { "path": "/cart",            "screen": "CartScreen",             "protected": true,  "params": [] },
+      { "path": "/checkout",        "screen": "CheckoutScreen",         "protected": true,  "params": [] },
+      { "path": "/order/:id/track", "screen": "OrderTrackingScreen",    "protected": true,  "params": ["id"] },
+      { "path": "/orders",          "screen": "OrderHistoryScreen",     "protected": true,  "params": [] },
+      { "path": "/profile",         "screen": "ProfileScreen",          "protected": true,  "params": [] },
+      { "path": "/error",           "screen": "ErrorScreen",            "protected": false, "params": [] }
+    ],
+    "protected_routes": ["/home", "/cart", "/checkout", "/orders", "/profile", "/restaurant/:id", "/order/:id/track"],
+    "guest_routes": ["/splash", "/onboarding", "/login", "/signup"],
+    "deep_link_scheme": "quickbite://",
+    "nested_navigators": [],
+    "navigation_package": "go_router",
+    "notes": "Use redirect on GoRouter to check auth state via AuthProvider before accessing protected routes."
+  },
+
+  "backend": {
+    "needs_backend": true,
+    "backend_type": "rest",
+    "realtime": true,
+    "realtime_reason": "Live driver location tracking requires WebSocket or SSE",
+    "auth_provider": "jwt",
+    "auth_methods": ["email_password", "google_oauth"],
+    "file_storage": "cloudinary",
+    "push_notifications": true,
+    "push_provider": "fcm",
+    "caching": true,
+    "background_jobs": true,
+    "third_party_apis": [
+      { "name": "Stripe",      "purpose": "Payment processing",  "url": "https://stripe.com/docs" },
+      { "name": "Google Maps", "purpose": "Live order tracking", "url": "https://developers.google.com/maps" }
+    ],
+    "api_endpoints": [
+      { "method": "POST", "path": "/api/v1/auth/login",        "purpose": "Login",               "auth_required": false, "roles": [] },
+      { "method": "POST", "path": "/api/v1/auth/register",     "purpose": "Register",            "auth_required": false, "roles": [] },
+      { "method": "GET",  "path": "/api/v1/restaurants",       "purpose": "List restaurants",    "auth_required": true,  "roles": ["customer"] },
+      { "method": "GET",  "path": "/api/v1/restaurants/:id",   "purpose": "Restaurant detail",   "auth_required": true,  "roles": ["customer"] },
+      { "method": "POST", "path": "/api/v1/orders",            "purpose": "Place order",         "auth_required": true,  "roles": ["customer"] },
+      { "method": "GET",  "path": "/api/v1/orders",            "purpose": "Order history",       "auth_required": true,  "roles": ["customer"] },
+      { "method": "GET",  "path": "/api/v1/orders/:id",        "purpose": "Order detail",        "auth_required": true,  "roles": ["customer", "driver", "restaurant_admin"] },
+      { "method": "GET",  "path": "/api/v1/profile",           "purpose": "Get user profile",    "auth_required": true,  "roles": ["customer"] },
+      { "method": "PATCH","path": "/api/v1/profile",           "purpose": "Update profile",      "auth_required": true,  "roles": ["customer"] }
+    ],
+    "environment_variables": ["JWT_SECRET", "STRIPE_KEY", "GOOGLE_MAPS_KEY", "FIREBASE_PROJECT_ID", "CLOUDINARY_URL"]
+  },
+
+  "database_tables": [
+    {
+      "name": "users",
+      "purpose": "All users across roles",
+      "fields": [
+        { "name": "id",         "type": "uuid",     "nullable": false, "unique": true,  "notes": "Primary key" },
+        { "name": "email",      "type": "String",   "nullable": false, "unique": true,  "notes": "" },
+        { "name": "password",   "type": "String",   "nullable": true,  "unique": false, "notes": "Nullable for OAuth users" },
+        { "name": "role",       "type": "String",   "nullable": false, "unique": false, "notes": "customer|driver|restaurant_admin|super_admin" },
+        { "name": "created_at", "type": "DateTime", "nullable": false, "unique": false, "notes": "" }
+      ],
+      "relations": [],
+      "indexes": ["email", "role"]
+    },
+    {
+      "name": "restaurants",
+      "purpose": "Restaurant profiles",
+      "fields": [
+        { "name": "id",          "type": "uuid",   "nullable": false, "unique": true,  "notes": "" },
+        { "name": "owner_id",    "type": "uuid",   "nullable": false, "unique": false, "notes": "FK → users.id" },
+        { "name": "name",        "type": "String", "nullable": false, "unique": false, "notes": "" },
+        { "name": "category",    "type": "String", "nullable": false, "unique": false, "notes": "" },
+        { "name": "latitude",    "type": "double", "nullable": false, "unique": false, "notes": "" },
+        { "name": "longitude",   "type": "double", "nullable": false, "unique": false, "notes": "" },
+        { "name": "is_open",     "type": "bool",   "nullable": false, "unique": false, "notes": "" }
+      ],
+      "relations": [{ "table": "users", "type": "one_to_one", "foreign_key": "owner_id" }],
+      "indexes": ["category", "is_open"]
+    },
+    {
+      "name": "menu_items",
+      "purpose": "Restaurant menu items",
+      "fields": [
+        { "name": "id",             "type": "uuid",   "nullable": false, "unique": true,  "notes": "" },
+        { "name": "restaurant_id",  "type": "uuid",   "nullable": false, "unique": false, "notes": "FK → restaurants.id" },
+        { "name": "name",           "type": "String", "nullable": false, "unique": false, "notes": "" },
+        { "name": "price",          "type": "double", "nullable": false, "unique": false, "notes": "" },
+        { "name": "is_available",   "type": "bool",   "nullable": false, "unique": false, "notes": "" }
+      ],
+      "relations": [{ "table": "restaurants", "type": "one_to_many", "foreign_key": "restaurant_id" }],
+      "indexes": ["restaurant_id", "is_available"]
+    },
+    {
+      "name": "orders",
+      "purpose": "Customer orders",
+      "fields": [
+        { "name": "id",              "type": "uuid",     "nullable": false, "unique": true,  "notes": "" },
+        { "name": "customer_id",     "type": "uuid",     "nullable": false, "unique": false, "notes": "FK → users.id" },
+        { "name": "restaurant_id",   "type": "uuid",     "nullable": false, "unique": false, "notes": "FK → restaurants.id" },
+        { "name": "driver_id",       "type": "uuid",     "nullable": true,  "unique": false, "notes": "Assigned after acceptance" },
+        { "name": "status",          "type": "String",   "nullable": false, "unique": false, "notes": "pending|accepted|preparing|on_the_way|delivered|cancelled" },
+        { "name": "total_amount",    "type": "double",   "nullable": false, "unique": false, "notes": "" },
+        { "name": "created_at",      "type": "DateTime", "nullable": false, "unique": false, "notes": "" }
+      ],
+      "relations": [
+        { "table": "users",       "type": "one_to_many", "foreign_key": "customer_id" },
+        { "table": "restaurants", "type": "one_to_many", "foreign_key": "restaurant_id" }
+      ],
+      "indexes": ["customer_id", "status", "created_at"]
+    },
+    {
+      "name": "payments",
+      "purpose": "Payment records per order",
+      "fields": [
+        { "name": "id",            "type": "uuid",     "nullable": false, "unique": true,  "notes": "" },
+        { "name": "order_id",      "type": "uuid",     "nullable": false, "unique": true,  "notes": "FK → orders.id" },
+        { "name": "stripe_pi_id",  "type": "String",   "nullable": false, "unique": true,  "notes": "Stripe PaymentIntent ID" },
+        { "name": "status",        "type": "String",   "nullable": false, "unique": false, "notes": "pending|succeeded|failed" },
+        { "name": "amount",        "type": "double",   "nullable": false, "unique": false, "notes": "" },
+        { "name": "paid_at",       "type": "DateTime", "nullable": true,  "unique": false, "notes": "" }
+      ],
+      "relations": [{ "table": "orders", "type": "one_to_one", "foreign_key": "order_id" }],
+      "indexes": ["order_id", "status"]
+    }
+  ],
+
+  "flutter_architecture": {
+    "state_management": "riverpod",
+    "state_management_reason": "Riverpod offers compile-safe providers, code generation, and excellent async support for real-time tracking.",
+    "architecture_pattern": "feature_first_clean_architecture",
+    "folder_structure": [
+      { "path": "lib/core/",                  "purpose": "Shared utilities, theme, constants, router" },
+      { "path": "lib/core/theme/",            "purpose": "AppTheme, ColorTokens, TextStyles" },
+      { "path": "lib/core/router/",           "purpose": "GoRouter configuration, route guards" },
+      { "path": "lib/core/network/",          "purpose": "Dio client, interceptors, error handler" },
+      { "path": "lib/features/auth/",         "purpose": "Login, signup, forgot password" },
+      { "path": "lib/features/auth/data/",    "purpose": "AuthRepository, AuthRemoteDataSource" },
+      { "path": "lib/features/auth/domain/",  "purpose": "AuthUseCase, AuthEntity" },
+      { "path": "lib/features/auth/presentation/", "purpose": "LoginScreen, AuthNotifier" },
+      { "path": "lib/features/home/",         "purpose": "Restaurant discovery" },
+      { "path": "lib/features/cart/",         "purpose": "Cart state and UI" },
+      { "path": "lib/features/order/",        "purpose": "Checkout, tracking, history" },
+      { "path": "lib/features/profile/",      "purpose": "User profile management" },
+      { "path": "lib/shared/widgets/",        "purpose": "Reusable widgets: buttons, cards, inputs" }
+    ],
+    "navigation_package": "go_router",
+    "network_layer": "dio",
+    "local_database": "isar",
+    "offline_first": false,
+    "modular": true,
+    "flavors": ["dev", "staging", "prod"]
+  },
+
+  "design_system": {
+    "theme": "modern_minimal",
+    "primary_color": "#FF6B35",
+    "secondary_color": "#2EC4B6",
+    "background_color": "#FFFFFF",
+    "surface_color": "#F8F8F8",
+    "error_color": "#E63946",
+    "success_color": "#2DC653",
+    "warning_color": "#FFB703",
+    "corner_radius": 16,
+    "spacing_unit": 8,
+    "font_family_display": "Sora",
+    "font_family_body": "DM Sans",
+    "icon_style": "rounded",
+    "dark_mode_support": true,
+    "typography": {
+      "display_large":  "32sp bold",
+      "headline_large": "24sp bold",
+      "title_large":    "20sp semibold",
+      "body_large":     "16sp regular",
+      "body_medium":    "14sp regular",
+      "label_large":    "14sp medium"
+    },
+    "elevation_style": "subtle",
+    "animation_style": "expressive",
+    "custom_theme_notes": [
+      "Use CardTheme with elevation 0 and border for cards",
+      "Apply surfaceTintColor = Colors.transparent to remove Material 3 tinting",
+      "Use PageTransitionsTheme with CupertinoPageTransitionsBuilder for iOS-like feel"
+    ]
+  },
+
+  "flutter_dependencies": [
+    { "package": "flutter_riverpod",      "version": "^2.5.1",  "purpose": "State management" },
+    { "package": "riverpod_annotation",   "version": "^2.3.5",  "purpose": "Code generation for providers" },
+    { "package": "go_router",             "version": "^14.1.4", "purpose": "Declarative routing" },
+    { "package": "dio",                   "version": "^5.4.3",  "purpose": "HTTP client" },
+    { "package": "isar",                  "version": "^3.1.0",  "purpose": "Local database for offline cache" },
+    { "package": "isar_flutter_libs",     "version": "^3.1.0",  "purpose": "Isar native binaries" },
+    { "package": "flutter_secure_storage","version": "^9.0.0",  "purpose": "Store JWT tokens securely" },
+    { "package": "google_maps_flutter",   "version": "^2.6.0",  "purpose": "Live order tracking map" },
+    { "package": "flutter_stripe",        "version": "^10.1.1", "purpose": "Stripe payment UI" },
+    { "package": "google_sign_in",        "version": "^6.2.1",  "purpose": "Google OAuth" },
+    { "package": "firebase_messaging",    "version": "^15.0.0", "purpose": "Push notifications via FCM" },
+    { "package": "cached_network_image",  "version": "^3.3.1",  "purpose": "Efficient image loading + caching" },
+    { "package": "shimmer",               "version": "^3.0.0",  "purpose": "Loading skeleton UI" },
+    { "package": "intl",                  "version": "^0.19.0", "purpose": "Date formatting, localisation" },
+    { "package": "freezed_annotation",    "version": "^2.4.1",  "purpose": "Immutable data classes" },
+    { "package": "json_annotation",       "version": "^4.9.0",  "purpose": "JSON serialisation" }
+  ],
+
+  "dev_dependencies": [
+    { "package": "build_runner",    "version": "^2.4.11", "purpose": "Code generation runner" },
+    { "package": "riverpod_generator","version": "^2.4.3","purpose": "Generate providers from annotations" },
+    { "package": "freezed",         "version": "^2.5.2",  "purpose": "Generate immutable model code" },
+    { "package": "json_serializable","version": "^6.8.0", "purpose": "Generate fromJson/toJson" },
+    { "package": "isar_generator",  "version": "^3.1.0",  "purpose": "Generate Isar schema" },
+    { "package": "flutter_test",    "version": "sdk: flutter","purpose": "Widget testing" },
+    { "package": "mockito",         "version": "^5.4.4",  "purpose": "Mocking for unit tests" }
+  ],
+
+  "testing_strategy": {
+    "unit_tests": true,
+    "widget_tests": true,
+    "integration_tests": true,
+    "test_coverage_target": "70%",
+    "recommended_packages": ["mockito", "flutter_test", "integration_test"]
+  },
+
+  "security_rules": [
+    "Store JWT access/refresh tokens in flutter_secure_storage — never SharedPreferences or Hive without encryption",
+    "Use Dio interceptors to auto-refresh tokens and retry on 401",
+    "Never log sensitive data (tokens, passwords, card info) in production",
+    "Validate all user inputs before sending to API",
+    "Use certificate pinning for production API calls"
+  ],
+
+  "performance_notes": [
+    "Use ListView.builder for all scrollable lists — never ListView with children",
+    "Use const constructors wherever possible to prevent unnecessary rebuilds",
+    "Cache restaurant images with cached_network_image and specify memCacheWidth",
+    "Use AutoDispose providers so state is cleaned up when screens are popped",
+    "Defer heavy computations (e.g. price calculations) to compute() in an isolate if list is large"
+  ],
+
+  "accessibility_notes": [
+    "Wrap all interactive widgets with Semantics and provide meaningful labels",
+    "Maintain minimum touch target of 48x48dp for all tappable areas",
+    "Support dynamic text scaling — avoid fixed heights for text containers",
+    "Ensure color contrast ratio >= 4.5:1 for all text on backgrounds"
+  ],
+
+  "monetization": {
+    "model": "commission",
+    "subscription_tiers": [],
+    "in_app_purchases": [],
+    "notes": "Platform takes a % commission per order from restaurants. Delivery fee paid by customer."
+  },
+
+  "analytics_events": [
+    "app_open", "restaurant_viewed", "item_added_to_cart", "checkout_started",
+    "order_placed", "order_tracking_viewed", "order_rated", "profile_updated"
+  ],
+
+  "confidence_score": 0.92,
+  "validation_passed": true,
+  "missing_info": [
+    "Exact commission percentage not specified",
+    "Whether driver app is a separate Flutter project or same project with role-based routing"
+  ],
+  "assumptions_made": [
+    "Single Flutter project with role-based bottom navigation for customer vs driver views",
+    "JWT-based auth using backend REST API (not Firebase Auth)",
+    "Stripe is the payment provider",
+    "Google Maps for tracking (not Mapbox or OSM)"
+  ],
+  "ai_notes": [
+    "Consider adding a scheduled delivery feature post-MVP — it significantly increases order volume",
+    "Implement skeleton loading (shimmer) before data loads to improve perceived performance",
+    "The real-time tracking WebSocket will need heartbeat/reconnect logic for production reliability"
+  ],
+  "validation_warnings": []
+}

@@ -1,0 +1,39 @@
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+planning_engine/.env
+
+# Python virtual environments
+.venv/
+venv/
+env/
+planning_engine/.venv/
+
+# Python cache / build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Generated planning outputs
+planning_engine/outputs/*
+!planning_engine/outputs/sample_plan.json
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Local archives
+*.zip
