@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.app_name_suggester import suggest_app_name
 from core.prompt_templates import (
     CLARIFICATION_GENERATOR,
     REQUIREMENT_COMPLETENESS_AUDITOR,
@@ -28,56 +29,90 @@ def _display_question(idx: int, q: dict) -> None:
     print(f"\n  ?  Q{idx}: {_question_with_examples(q)}")
     if q.get("why"):
         print(f"      Why: {q['why']}")
+    if q.get("default_answer"):
+        print(f"      Press Enter to use {q['default_answer']}, or type your own.")
 
 
 def _ask_user(question: dict, idx: int) -> str:
     _display_question(idx, question)
     while True:
         raw = input("\n  >  Your answer: ").strip()
+        if not raw and question.get("default_answer"):
+            return question["default_answer"]
         if not raw:
             continue
         return raw
 
 
-REQUIRED_STARTUP_QUESTIONS = [
-    {
-        "id": "app_name",
-        "question": "What should the app be called?",
-        "why": "This helps the plan use the right brand name.",
-        "examples": [
-            "infer a name from my idea",
-            "BabyKnits",
-        ],
-    },
-    {
-        "id": "target_users",
-        "question": "Who will mainly use this app?",
-        "why": "This helps choose the right pages, wording, and design style.",
-        "examples": [
-            "moms and parents",
+def _required_startup_questions(prompt: str, intent: dict) -> list[dict]:
+    domain = (intent.get("domain") or "").lower()
+    suggested_name = suggest_app_name(prompt, intent)
+    detected_modules = {
+        str(module).lower() for module in intent.get("detected_modules", [])
+    }
+
+    questions = [
+        {
+            "id": "app_name",
+            "question": "What should the app be called, or should I choose one?",
+            "why": "This helps the plan use the right brand name.",
+            "examples": [suggested_name],
+            "default_answer": suggested_name,
+        },
+        {
+            "id": "target_users",
+            "question": "Who will mainly use this app?",
+            "why": "This helps choose the right pages, wording, and design style.",
+            "examples": [
+                "students and teachers",
+                "employees and managers",
+                "general users",
+            ],
+        },
+        {
+            "id": "mvp_scope",
+            "question": "What should users be able to do in the first version?",
+            "why": "This keeps the plan focused on what you actually want first.",
+            "examples": [
+                "mark attendance, view history, and export reports",
+                "sign in, check in/out, and manage profile",
+                "use sensible defaults",
+            ],
+        },
+        {
+            "id": "admin_management",
+            "question": "Do you need an admin or manager area?",
+            "why": "This decides whether the plan should include role-based management screens.",
+            "examples": [
+                "yes, admins manage users and reports",
+                "manager approval only",
+                "no admin area in the first version",
+            ],
+        },
+    ]
+
+    if domain == "ecommerce" or {"cart", "products", "orders"} & detected_modules:
+        questions[1]["examples"] = [
+            "customers buying products",
             "general customers",
-        ],
-    },
-    {
-        "id": "mvp_scope",
-        "question": "What should customers be able to do in the first version?",
-        "why": "This keeps the plan focused on what you actually want first.",
-        "examples": [
+            "shop owners and customers",
+        ]
+        questions[2]["question"] = "What should customers be able to do in the first version?"
+        questions[2]["examples"] = [
             "browse products, add to cart, order, and manage profile",
             "browse products and contact me to order",
-        ],
-    },
-    {
-        "id": "business_management",
-        "question": "Do you want to manage products and orders inside the app?",
-        "why": "This decides whether the plan should include a shop owner area.",
-        "examples": [
+            "use sensible defaults",
+        ]
+        questions[3]["id"] = "business_management"
+        questions[3]["question"] = "Do you want to manage products and orders inside the app?"
+        questions[3]["why"] = "This decides whether the plan should include a shop owner area."
+        questions[3]["examples"] = [
             "yes, include a simple owner/admin area",
             "customer app only for now",
             "maybe later",
-        ],
-    },
-]
+        ]
+
+    return questions
 
 
 def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
@@ -86,7 +121,7 @@ def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
 
     print("\n  Before planning, I need a few required basics.\n")
     answers = {}
-    for i, question in enumerate(REQUIRED_STARTUP_QUESTIONS, 1):
+    for i, question in enumerate(_required_startup_questions(prompt, intent), 1):
         answer = _ask_user(question, i)
         answers[question["id"]] = {
             "question": question["question"],
@@ -119,7 +154,7 @@ def _fallback_questions(intent: dict) -> list[dict]:
             ),
             "why": "This helps plan product pages, filters, and order details.",
             "examples": [
-                "crochet baby clothing with size/color variants",
+                "clothing with size/color variants",
                 "simple products without variants",
             ],
         },
@@ -161,9 +196,9 @@ def _fallback_questions(intent: dict) -> list[dict]:
             "question": "What visual style should the app use?",
             "why": "This helps choose colors, fonts, and the overall feeling of the app.",
             "examples": [
-                "high contrast, warm, engaging for moms",
-                "soft pastel baby boutique style",
-                "luxury handmade brand style",
+                "modern and high contrast",
+                "soft and minimal",
+                "premium brand style",
             ],
         },
     ]

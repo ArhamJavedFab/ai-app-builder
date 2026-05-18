@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.schema import MasterPlan, empty_plan
 from core.gemini_client import call_gemini_json
+from core.app_name_suggester import suggest_app_name
 from core.plan_editor import apply_patch
 from core.prompt_templates import PLAN_REPAIRER
 from agents.intent_analyzer       import analyze_intent
@@ -67,6 +68,23 @@ def _apply_plan_dict(plan: MasterPlan, data: dict) -> None:
     for key in plan.to_dict().keys():
         if key in data:
             setattr(plan, key, data[key])
+
+
+def _wants_suggested_name(answer: str) -> bool:
+    normalized = answer.strip().lower()
+    suggestion_terms = {
+        "infer",
+        "suggest",
+        "suggest one",
+        "suggest a name",
+        "you suggest",
+        "generate",
+        "auto",
+        "automatic",
+        "use sensible default",
+        "use sensible defaults",
+    }
+    return any(term in normalized for term in suggestion_terms)
 
 
 def _store_validation(plan: MasterPlan, validation: dict) -> None:
@@ -225,8 +243,14 @@ def run_planning_pipeline(user_prompt: str) -> MasterPlan:
 
     # Apply app name from clarifications if provided
     app_name_answer = clarifications.get("app_name", {}).get("answer", "")
-    if app_name_answer and "infer" not in app_name_answer.lower():
+    if app_name_answer and _wants_suggested_name(app_name_answer):
+        plan.app_name = suggest_app_name(user_prompt, intent)
+        if config.VERBOSE:
+            print(f"  Suggested app name: {plan.app_name}")
+    elif app_name_answer:
         plan.app_name = app_name_answer
+    elif not plan.app_name:
+        plan.app_name = suggest_app_name(user_prompt, intent)
 
     # ── Stage 3: Features ────────────────────────────────────
     _separator("Feature Planning")
