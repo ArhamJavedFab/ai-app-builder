@@ -10,7 +10,7 @@ from core.prompt_templates import BACKEND_PLANNER
 import config
 
 
-def plan_backend(intent: dict, features: dict) -> dict:
+def plan_backend(intent: dict, features: dict, screens: dict | None = None) -> dict:
     """
     Stage 6 — Plan backend type, auth, APIs, storage, etc.
     Returns full backend requirements dict.
@@ -21,6 +21,7 @@ def plan_backend(intent: dict, features: dict) -> dict:
     filled = BACKEND_PLANNER.format(
         intent_json=json.dumps(intent, indent=2),
         features_json=json.dumps(features, indent=2),
+        screens_json=json.dumps(screens or {}, indent=2),
     )
     result = call_gemini_json(filled, use_pro=False)
 

@@ -10,7 +10,11 @@ import config
 
 
 def _log_path() -> Path:
-    base_dir = Path(__file__).resolve().parent
+    configured_dir = Path(config.COST_LOG_DIR)
+    if configured_dir.is_absolute():
+        base_dir = configured_dir
+    else:
+        base_dir = Path(__file__).resolve().parents[1] / configured_dir
     base_dir.mkdir(parents=True, exist_ok=True)
     return base_dir / config.COST_LOG_FILENAME
 
@@ -91,6 +95,8 @@ def log_llm_call(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": model,
         "success": success,
+        "input_characters": len(prompt),
+        "output_characters": len(output),
         "input_tokens": usage["input_tokens"],
         "output_tokens": usage["output_tokens"],
         "total_tokens": usage["total_tokens"],
@@ -116,4 +122,3 @@ def log_llm_call(
         "Estimated from token counts and GEMINI_*_COST_PER_1M settings."
     )
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-

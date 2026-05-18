@@ -16,29 +16,83 @@ from core.prompt_templates import (
 import config
 
 
+def _question_with_examples(q: dict) -> str:
+    question = q.get("question", "")
+    examples = q.get("examples") or q.get("options") or []
+    if examples:
+        question = f"{question} (e.g. {', '.join(examples)})"
+    return question
+
+
 def _display_question(idx: int, q: dict) -> None:
-    print(f"\n  ?  Q{idx}: {q.get('question', '')}")
+    print(f"\n  ?  Q{idx}: {_question_with_examples(q)}")
     if q.get("why"):
         print(f"      Why: {q['why']}")
-    options = q.get("options", [])
-    if options:
-        for i, opt in enumerate(options, 1):
-            print(f"         {i}. {opt}")
-        print(f"         {len(options) + 1}. Other - type your own answer")
 
 
 def _ask_user(question: dict, idx: int) -> str:
     _display_question(idx, question)
-    options = question.get("options", [])
     while True:
         raw = input("\n  >  Your answer: ").strip()
         if not raw:
             continue
-        if raw.isdigit():
-            choice = int(raw)
-            if 1 <= choice <= len(options):
-                return options[choice - 1]
         return raw
+
+
+REQUIRED_STARTUP_QUESTIONS = [
+    {
+        "id": "app_name",
+        "question": "What should the app be called?",
+        "why": "This helps the plan use the right brand name.",
+        "examples": [
+            "infer a name from my idea",
+            "BabyKnits",
+        ],
+    },
+    {
+        "id": "target_users",
+        "question": "Who will mainly use this app?",
+        "why": "This helps choose the right pages, wording, and design style.",
+        "examples": [
+            "moms and parents",
+            "general customers",
+        ],
+    },
+    {
+        "id": "mvp_scope",
+        "question": "What should customers be able to do in the first version?",
+        "why": "This keeps the plan focused on what you actually want first.",
+        "examples": [
+            "browse products, add to cart, order, and manage profile",
+            "browse products and contact me to order",
+        ],
+    },
+    {
+        "id": "business_management",
+        "question": "Do you want to manage products and orders inside the app?",
+        "why": "This decides whether the plan should include a shop owner area.",
+        "examples": [
+            "yes, include a simple owner/admin area",
+            "customer app only for now",
+            "maybe later",
+        ],
+    },
+]
+
+
+def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
+    if not config.ASK_REQUIRED_STARTUP_QUESTIONS:
+        return {}
+
+    print("\n  Before planning, I need a few required basics.\n")
+    answers = {}
+    for i, question in enumerate(REQUIRED_STARTUP_QUESTIONS, 1):
+        answer = _ask_user(question, i)
+        answers[question["id"]] = {
+            "question": question["question"],
+            "answer": answer,
+        }
+    return answers
 
 
 def _fallback_questions(intent: dict) -> list[dict]:
@@ -47,12 +101,11 @@ def _fallback_questions(intent: dict) -> list[dict]:
         return [
             {
                 "id": "core_scope",
-                "question": "What are the must-have screens/features for the first version?",
+                "question": "What are the must-have pages or actions for the first version?",
                 "why": "This keeps the plan focused on what you actually want built first.",
-                "options": [
-                    "Use sensible defaults",
-                    "Basic app with auth, home, profile, settings",
-                    "I will type the exact screens/features",
+                "examples": [
+                    "use sensible defaults",
+                    "home, account/profile, and settings",
                 ],
             }
         ]
@@ -61,57 +114,56 @@ def _fallback_questions(intent: dict) -> list[dict]:
         {
             "id": "products",
             "question": (
-                "What products will the ecommerce app sell, and do products need "
-                "variants like size, color, or age range?"
+                "What kind of products will you sell, and do they come in choices "
+                "like size, color, or age range?"
             ),
-            "why": "Product structure changes screens, filters, cart, and database tables.",
-            "options": [
-                "Crochet baby clothing with size/color variants",
-                "Simple products without variants",
-                "I will type the exact product structure",
+            "why": "This helps plan product pages, filters, and order details.",
+            "examples": [
+                "crochet baby clothing with size/color variants",
+                "simple products without variants",
             ],
         },
         {
             "id": "checkout",
-            "question": "How should checkout work in the first version?",
-            "why": "Payments and orders change backend, database, and validation requirements.",
-            "options": [
-                "Online payment plus cash on delivery",
-                "Cash on delivery only",
-                "No checkout yet, catalog/contact only",
+            "question": "How should customers place an order?",
+            "why": "This decides what the cart and checkout flow should include.",
+            "examples": [
+                "online payment plus cash on delivery",
+                "cash on delivery only",
+                "customers contact me to order",
             ],
         },
         {
             "id": "auth_profile",
             "question": (
-                "Should customers create accounts with profile, addresses, order "
+                "Should customers have an account with profile, addresses, order "
                 "history, and settings?"
             ),
-            "why": "Auth changes protected routes, user tables, and profile screens.",
-            "options": [
-                "Yes, full customer account",
-                "Guest checkout with optional account",
-                "No accounts in first version",
+            "why": "This helps decide what should be inside the profile area.",
+            "examples": [
+                "full customer account",
+                "guest checkout with optional account",
+                "no accounts in first version",
             ],
         },
         {
             "id": "store_admin",
-            "question": "Do you need an admin/store-owner area to manage products and orders?",
-            "why": "Admin features add roles, protected screens, backend endpoints, and database rules.",
-            "options": [
-                "Yes, include admin product/order management",
-                "No, customer app only",
-                "Later, post-MVP",
+            "question": "Do you need a shop owner area to add products and see orders?",
+            "why": "This decides whether the plan includes owner-only pages.",
+            "examples": [
+                "include product and order management",
+                "customer app only",
+                "later, post-MVP",
             ],
         },
         {
             "id": "visual_direction",
             "question": "What visual style should the app use?",
-            "why": "Design direction changes colors, typography, components, and accessibility notes.",
-            "options": [
-                "High contrast, warm, engaging for moms",
-                "Soft pastel baby boutique style",
-                "Luxury handmade brand style",
+            "why": "This helps choose colors, fonts, and the overall feeling of the app.",
+            "examples": [
+                "high contrast, warm, engaging for moms",
+                "soft pastel baby boutique style",
+                "luxury handmade brand style",
             ],
         },
     ]
@@ -139,7 +191,12 @@ def _legacy_question_generation(prompt: str, intent: dict) -> list[dict]:
     return result.get("questions", [])
 
 
-def extract_requirements(prompt: str, intent: dict, force: bool = False) -> dict:
+def extract_requirements(
+    prompt: str,
+    intent: dict,
+    force: bool = False,
+    initial_clarifications: dict | None = None,
+) -> dict:
     """
     Stage 2 - ask clarifying questions until the plan has enough real context.
     Returns a dict of {question_id: {question, answer}}.
@@ -147,7 +204,7 @@ def extract_requirements(prompt: str, intent: dict, force: bool = False) -> dict
     if config.VERBOSE:
         print("  Checking requirement clarity...")
 
-    clarifications: dict = {}
+    clarifications: dict = dict(initial_clarifications or {})
 
     for round_no in range(1, config.MAX_CLARIFICATION_ROUNDS + 1):
         audit = _audit_completeness(prompt, intent, clarifications)
@@ -193,4 +250,3 @@ def extract_requirements(prompt: str, intent: dict, force: bool = False) -> dict
 
     print()
     return clarifications
-

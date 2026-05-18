@@ -16,6 +16,8 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 from orchestration.planning_orchestrator import run_planning_pipeline
+from core.plan_editor import run_chat_editor
+from core.summary import print_concise_summary, save_summary
 import config
 
 
@@ -42,6 +44,19 @@ def get_prompt_from_user() -> str:
     return " ".join(l for l in lines if l).strip()
 
 
+def _summary_path_for(output_path: str) -> str:
+    base, _ext = os.path.splitext(output_path)
+    return f"{base}{config.SUMMARY_FILENAME_SUFFIX}"
+
+
+def _ask_yes_no(question: str, default: bool = False) -> bool:
+    suffix = "Y/n" if default else "y/N"
+    answer = input(f"{question} ({suffix}): ").strip().lower()
+    if not answer:
+        return default
+    return answer in {"y", "yes"}
+
+
 def main() -> None:
     print(BANNER)
 
@@ -65,10 +80,25 @@ def main() -> None:
         action="store_true",
         help="Suppress verbose step-by-step logs",
     )
+    parser.add_argument(
+        "--chat",
+        action="store_true",
+        help="Open chat edit mode after generating the plan",
+    )
+    parser.add_argument(
+        "--edit-plan",
+        type=str,
+        default=None,
+        help="Open chat edit mode for an existing plan JSON and exit",
+    )
     args = parser.parse_args()
 
     if args.quiet:
         config.VERBOSE = False
+
+    if args.edit_plan:
+        run_chat_editor(args.edit_plan, _summary_path_for(args.edit_plan))
+        return
 
     # ── Get prompt ───────────────────────────────────────────
     prompt = args.prompt
@@ -105,37 +135,23 @@ def main() -> None:
         config.OUTPUT_DIR, config.FINAL_PLAN_FILENAME
     )
     master_plan.save(output_path)
+    summary_path = _summary_path_for(output_path)
+    plan_dict = master_plan.to_dict()
+    save_summary(plan_dict, summary_path)
 
     # ── Summary ───────────────────────────────────────────────
-    plan_dict = master_plan.to_dict()
+    print_concise_summary(plan_dict)
 
-    print(f"\n  📊  PLAN SUMMARY")
-    print(f"  {'─' * 56}")
-    print(f"  App Name:        {plan_dict['app_name'] or '(unnamed)'}")
-    print(f"  App Type:        {plan_dict['app_type']}")
-    print(f"  Screens:         {len(plan_dict['screens'])}")
-    print(f"  Features:        {sum(len(m.get('items',[])) for m in plan_dict['features'])}")
-    print(f"  DB Tables:       {len(plan_dict['database_tables'])}")
-    print(f"  Dependencies:    {len(plan_dict['flutter_dependencies'])}")
-    print(f"  State Mgmt:      {plan_dict['flutter_architecture'].get('state_management','')}")
-    print(f"  Architecture:    {plan_dict['flutter_architecture'].get('architecture_pattern','')}")
-    print(f"  Confidence:      {plan_dict['confidence_score']:.0%}")
-    print(f"  Validated:       {'✅ Yes' if plan_dict['validation_passed'] else '❌ No (see warnings)'}")
-    print(f"  {'─' * 56}")
+    print(f"\n  📁  Full JSON saved to: {output_path}")
+    print(f"  📝  Short summary saved to: {summary_path}")
+    print(f"  🧮  Usage log saved to: {os.path.join(config.COST_LOG_DIR, config.COST_LOG_FILENAME)}\n")
 
-    warnings = plan_dict.get("validation_warnings", [])
-    if warnings:
-        print(f"\n  ⚠️   Warnings ({len(warnings)}):")
-        for w in warnings:
-            print(f"       • {w}")
+    should_chat = args.chat
+    if not should_chat and not args.prompt and sys.stdin.isatty():
+        should_chat = _ask_yes_no("  Open chat edit mode now")
 
-    missing = plan_dict.get("missing_info", [])
-    if missing:
-        print(f"\n  ℹ️   Missing info (consider a follow-up run):")
-        for m in missing:
-            print(f"       • {m}")
-
-    print(f"\n  📁  Output saved to: {output_path}\n")
+    if should_chat:
+        run_chat_editor(output_path, summary_path)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from typing import Any
 
 from core.gemini_client import call_gemini_json
 from core.prompt_templates import PLAN_PATCHER
+from core.summary import print_concise_summary, save_summary
 from validation.validator import validate_plan
 
 
@@ -15,7 +16,9 @@ def load_plan(path: str | Path) -> dict[str, Any]:
 
 
 def save_plan(plan: dict[str, Any], path: str | Path) -> None:
-    Path(path).write_text(json.dumps(plan, indent=2), encoding="utf-8")
+    plan_path = Path(path)
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
 
 
 def _decode_pointer_part(part: str) -> str:
@@ -98,7 +101,7 @@ def edit_plan(plan: dict[str, Any], instruction: str) -> tuple[dict[str, Any], d
     }
 
 
-def run_chat_editor(path: str | Path) -> None:
+def run_chat_editor(path: str | Path, summary_path: str | Path | None = None) -> None:
     plan_path = Path(path)
     plan = load_plan(plan_path)
     print("\n  Chat edit mode. Type a change like: update background color to black")
@@ -111,10 +114,20 @@ def run_chat_editor(path: str | Path) -> None:
         if instruction.lower() in {"exit", "quit", "q"}:
             break
 
-        plan, result = edit_plan(plan, instruction)
+        try:
+            plan, result = edit_plan(plan, instruction)
+        except RuntimeError as e:
+            print(f"  Edit failed: {e}")
+            print("  Plan was not changed.")
+            continue
+
         save_plan(plan, plan_path)
+        if summary_path:
+            save_summary(plan, summary_path)
         print(f"  Applied: {result['patch'].get('summary', instruction)}")
         print(f"  Saved: {plan_path}")
+        if summary_path:
+            print(f"  Summary: {summary_path}")
+        print_concise_summary(plan)
         if not plan.get("validation_passed"):
             print("  Warning: edited plan did not pass validation.")
-

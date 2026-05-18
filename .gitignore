@@ -26,6 +26,7 @@ dist/
 # Generated planning outputs
 planning_engine/outputs/*
 !planning_engine/outputs/sample_plan.json
+planning_engine/cast_calculation/llm_usage.json
 
 # Editor / OS files
 .vscode/

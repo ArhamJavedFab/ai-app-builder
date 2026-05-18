@@ -46,6 +46,8 @@ And the original prompt:
 
 Identify the MOST important missing details that would significantly change the architecture or features.
 Ask at most {max_questions} questions, only what is truly ambiguous.
+Ask open-ended questions. Do not offer multiple-choice options.
+Put short answer hints in examples, which will be shown to the user as "(e.g. ...)".
 
 Return ONLY valid JSON:
 {{
@@ -55,7 +57,7 @@ Return ONLY valid JSON:
       "id":      "q1",
       "question": "<clear, specific question>",
       "why":      "<one sentence: why this matters for architecture>",
-      "options":  ["<option A>", "<option B>", "<option C>"]
+      "examples": ["<short example answer>", "<another short example answer>"]
     }}
   ]
 }}
@@ -76,7 +78,9 @@ Current user clarifications:
 {clarifications_json}
 
 Decide if there is enough information to produce a real implementation plan, not a generic guessed plan.
-For ecommerce apps, the plan is NOT clear enough unless product type, target users, core screens, checkout/payment expectation, auth/profile expectation, admin/store management expectation, and visual direction are known or explicitly marked as "use sensible default".
+For ecommerce apps, the plan is NOT clear enough unless product type, target users, core screens,
+checkout/payment expectation, auth/profile expectation, admin/store management expectation,
+and visual direction are known or explicitly marked as "use sensible default".
 
 Return ONLY valid JSON:
 {{
@@ -88,12 +92,13 @@ Return ONLY valid JSON:
       "id": "q1",
       "question": "<clear question that removes one important ambiguity>",
       "why": "<why this changes the generated plan>",
-      "options": ["<option A>", "<option B>", "<option C>"]
+      "examples": ["<short example answer>", "<another short example answer>"]
     }}
   ]
 }}
 
-Ask at most {max_questions} questions. Prefer grouped questions with useful options.
+Ask at most {max_questions} questions. Prefer grouped, open-ended questions with useful examples.
+Do not offer multiple-choice options. The user should be able to freely answer in their own words.
 """
 
 # ── FEATURE PLANNER ──────────────────────────────────────────
@@ -127,6 +132,11 @@ Generate a complete feature breakdown. Return ONLY valid JSON:
   "mvp_features":      ["<feature name>", ...],
   "post_mvp_features": ["<feature name>", ...]
 }}
+
+Rules:
+- Do not create circular dependencies.
+- Every depends_on value must exactly match a feature name that appears earlier in the JSON.
+- Keep the MVP focused on the clarified scope; do not add seller marketplace features unless admin/store management was requested.
 """
 
 # ── SCREEN PLANNER ───────────────────────────────────────────
@@ -143,6 +153,19 @@ Features:
 For every feature, generate the Flutter screens needed.
 Also include: onboarding flow, splash screen, error screens.
 Think like a Flutter developer — name screens with "Screen" suffix.
+Use Riverpod-style names in state_needed by default, e.g. AuthProvider,
+ProductProvider, CartProvider. Do not use Bloc names unless the app context
+explicitly asks for bloc.
+Set api_calls to stable logical actions such as "GET /api/v1/products";
+these must be real endpoint paths that a backend planner can implement.
+
+IMPORTANT RULES:
+- Every screen must have a unique name — never duplicate screen names.
+- Every screen must have a non-empty route path (e.g. /home, /product/:id).
+- Include an ErrorScreen with route /error.
+- Include a SplashScreen with route /splash.
+- If auth is needed, include a LoginScreen with route /login and SignupScreen with route /signup.
+- If the app has admin features, admin screens must have distinct names prefixed with "Admin".
 
 Return ONLY valid JSON:
 {{
@@ -156,8 +179,8 @@ Return ONLY valid JSON:
       "widgets":     ["<ReusableWidgetName>", ...],
       "bottom_sheets": ["<BottomSheetName>", ...],
       "dialogs":     ["<DialogName>", ...],
-      "state_needed": ["<ProviderName or BlocName>", ...],
-      "api_calls":   ["<endpoint or action>", ...],
+      "state_needed": ["<ProviderName>", ...],
+      "api_calls":   ["<GET|POST|etc /api/v1/path>", ...],
       "notes":       "<any Flutter-specific notes>"
     }}
   ],
@@ -174,15 +197,21 @@ Return ONLY valid JSON:
 # ── NAVIGATION PLANNER ───────────────────────────────────────
 
 NAVIGATION_PLANNER = """
-You are a Navigation Planning agent for Flutter (using go_router or auto_route).
+You are a Navigation Planning agent for Flutter (using go_router).
 
 App context:
 {intent_json}
 
-Screens:
+Screens list (ONLY use routes and screen names from this list):
 {screens_json}
 
 Design the complete navigation structure.
+
+CRITICAL RULES:
+- Every route in "routes" must match exactly a "route" field from the screens list above.
+- Every route in "bottom_tabs" must also exist in the "routes" array.
+- Do not invent routes that are not in the screen list.
+- protected_routes and guest_routes must only contain paths from the routes array.
 
 Return ONLY valid JSON:
 {{
@@ -191,13 +220,13 @@ Return ONLY valid JSON:
     {{
       "label": "<Tab label>",
       "icon":  "<material icon name>",
-      "route": "<route path>"
+      "route": "<route path — must exist in routes array>"
     }}
   ],
   "routes": [
     {{
-      "path":        "<e.g. /home>",
-      "screen":      "<ScreenName>",
+      "path":        "<exact route from screens list>",
+      "screen":      "<exact screen name from screens list>",
       "protected":   true|false,
       "params":      ["<param name>", ...]
     }}
@@ -205,14 +234,9 @@ Return ONLY valid JSON:
   "protected_routes":  ["<route>", ...],
   "guest_routes":      ["<route>", ...],
   "deep_link_scheme":  "<e.g. myapp://>",
-  "nested_navigators": [
-    {{
-      "parent": "<ScreenName>",
-      "children": ["<ScreenName>", ...]
-    }}
-  ],
-  "navigation_package": "<go_router|auto_route>",
-  "notes": "<any navigation patterns or guards>"
+  "nested_navigators": [],
+  "navigation_package": "go_router",
+  "notes": "<auth guard strategy>"
 }}
 """
 
@@ -227,21 +251,36 @@ App context:
 Features:
 {features_json}
 
+Screens (every api_call listed here must have a matching endpoint below):
+{screens_json}
+
 Design the complete backend requirements.
+
+CRITICAL RULES:
+- Generate an API endpoint for EVERY api_call path listed in any screen above.
+- For public listing endpoints (e.g. GET /api/v1/products), set auth_required: false AND roles: [].
+  Never put roles on an endpoint that has auth_required: false.
+- For protected endpoints, set auth_required: true and list the allowed roles.
+- Always include: GET /api/v1/user/profile and PATCH /api/v1/user/profile for profile screens.
+- If admin features exist, include admin endpoints with roles: ["admin"].
+- If COD (cash on delivery) is the payment method, set needs_payment_gateway: false.
+  Cart and orders still need endpoints but no Stripe/payment table is required.
 
 Return ONLY valid JSON:
 {{
-  "needs_backend":    true|false,
-  "backend_type":     "<rest|graphql|firebase|supabase>",
-  "realtime":         true|false,
-  "realtime_reason":  "<why realtime is needed>",
-  "auth_provider":    "<jwt|firebase_auth|supabase_auth|oauth2>",
-  "auth_methods":     ["<email_password>", "<google>", "<apple>", ...],
-  "file_storage":     "<s3|cloudinary|firebase_storage|supabase_storage|none>",
-  "push_notifications": true|false,
-  "push_provider":    "<fcm|onesignal|none>",
-  "caching":          true|false,
-  "background_jobs":  true|false,
+  "needs_backend":          true|false,
+  "backend_type":           "<rest|graphql|firebase|supabase>",
+  "realtime":               true|false,
+  "realtime_reason":        "<why realtime is needed, or empty string>",
+  "auth_provider":          "<jwt|firebase_auth|supabase_auth|oauth2>",
+  "auth_methods":           ["<email_password>", ...],
+  "file_storage":           "<s3|cloudinary|firebase_storage|supabase_storage|none>",
+  "push_notifications":     true|false,
+  "push_provider":          "<fcm|onesignal|none>",
+  "caching":                true|false,
+  "background_jobs":        true|false,
+  "needs_payment_gateway":  true|false,
+  "payment_method":         "<stripe|cod|none>",
   "third_party_apis": [
     {{
       "name":    "<API name>",
@@ -251,11 +290,11 @@ Return ONLY valid JSON:
   ],
   "api_endpoints": [
     {{
-      "method":   "<GET|POST|PUT|DELETE|PATCH>",
-      "path":     "<e.g. /api/v1/users>",
-      "purpose":  "<what it does>",
+      "method":        "<GET|POST|PUT|DELETE|PATCH>",
+      "path":          "<e.g. /api/v1/users>",
+      "purpose":       "<what it does>",
       "auth_required": true|false,
-      "roles":    ["<role>"]
+      "roles":         ["<role — only when auth_required is true, else empty array []>"]
     }}
   ],
   "environment_variables": ["<VAR_NAME>", ...]
@@ -273,10 +312,22 @@ App context:
 Features:
 {features_json}
 
-Backend:
+Backend config:
 {backend_json}
 
 Design the complete database schema.
+
+CRITICAL RULES:
+- If needs_payment_gateway is false (e.g. COD), include an "orders" table but NOT a "payments" table.
+- If needs_payment_gateway is true, include BOTH "orders" AND "payments" tables.
+- Include a table for every major MVP feature module:
+  * ecommerce: users, products, categories, cart_items, orders, order_items, addresses
+  * auth: users table always required
+  * admin features: no extra table needed, use role field in users
+- For product variants (size, color, age_range), add a "product_variants" table.
+- Do NOT add tables for post_mvp features — keep the schema focused on MVP.
+- Cart strategy: use server-side cart (cart_items table linked to user) as the default.
+  Only use local-only cart if the backend explicitly has no cart endpoint.
 
 Return ONLY valid JSON:
 {{
@@ -322,11 +373,20 @@ Complexity and features:
 Design the complete Flutter architecture.
 Be specific — a junior Flutter developer should be able to follow this plan.
 
+CRITICAL RULES:
+- Choose ONE cart storage strategy: either local (Isar/Hive) OR server-side (API).
+  Do not mix them. If the backend has cart endpoints, use server-side. Otherwise use local.
+- Do not include both "hive" and a server cart in dependencies — pick one.
+- State management must be consistent: if riverpod, use only Provider/Notifier naming,
+  not Bloc/Cubit naming.
+- Every screen that shows user-specific data needs at least one provider in state_needed.
+
 Return ONLY valid JSON:
 {{
   "state_management": "<riverpod|bloc|provider|getx|mobx>",
   "state_management_reason": "<why this choice>",
   "architecture_pattern": "<feature_first_clean_architecture|layered_clean_architecture|mvc|mvvm>",
+  "cart_strategy": "<local|server>",
   "folder_structure": [
     {{
       "path":    "<e.g. lib/features/auth/>",
@@ -338,7 +398,7 @@ Return ONLY valid JSON:
   "local_database": "<isar|hive|sqflite|drift>",
   "offline_first": true|false,
   "modular": true|false,
-  "flavors": ["<dev>", "<staging>", "<prod>"],
+  "flavors": ["dev", "staging", "prod"],
   "flutter_dependencies": [
     {{
       "package": "<pub.dev package name>",
@@ -358,7 +418,7 @@ Return ONLY valid JSON:
     "widget_tests":      true|false,
     "integration_tests": true|false,
     "test_coverage_target": "<e.g. 70%>",
-    "recommended_packages": ["<mockito>", "<bloc_test>"]
+    "recommended_packages": ["mockito", "flutter_test"]
   }},
   "security_rules": [
     "<e.g. Store tokens in flutter_secure_storage, never SharedPreferences>"
@@ -383,14 +443,25 @@ App context:
 App type: {app_type}
 Target users: {target_users}
 
+User's branding preferences (from clarifications — MUST be respected):
+{branding_notes}
+
 Design a complete Flutter design system.
+
+CRITICAL RULES:
+- If the user specified accent/primary color, use it exactly as primary_color.
+- If the user specified background color (e.g. "wheat"), use the correct hex for it as background_color.
+- Do NOT override user-specified colors with generic defaults.
+- wheat = #F5DEB3, coral red = #FF4444, soft red accent = #E53935
+- If user said "pastel" style, the theme must be "soft_pastel" and fonts must be playful/rounded.
+- All colors must be valid 6-digit hex codes (e.g. #FF4444, not #F44).
 
 Return ONLY valid JSON:
 {{
   "theme":             "<modern_minimal|playful|professional|luxury|bold_editorial|soft_pastel|dark_techy>",
-  "primary_color":     "<hex>",
+  "primary_color":     "<hex — user's accent color if specified>",
   "secondary_color":   "<hex>",
-  "background_color":  "<hex>",
+  "background_color":  "<hex — user's background color if specified>",
   "surface_color":     "<hex>",
   "error_color":       "<hex>",
   "success_color":     "<hex>",
@@ -420,22 +491,28 @@ Return ONLY valid JSON:
 VALIDATION_AGENT = """
 You are a Flutter App Plan Validator — the final quality gate.
 
-Review this complete app plan and identify ALL issues.
+Review this complete app plan and identify real structural issues only.
 
 Full Plan:
 {plan_json}
 
-Check for:
-1. Screens without routes
-2. Routes without screens
-3. Auth screens missing (if auth is needed)
-4. Missing tables for detected features (e.g. cart feature but no cart table)
-5. Navigation tabs referencing non-existent screens
-6. Duplicate screen names
-7. Missing error/empty state screens
-8. Backend needed but no auth provider set
-9. Payment feature but no payment table or API endpoint
-10. Any architectural inconsistencies
+Check ONLY for these concrete issues:
+1. Screen name appears more than once in the screens array → critical
+2. A route in bottom_tabs does not exist in the routes array → critical
+3. Auth provider is set but no LoginScreen exists in screens → critical
+4. needs_payment_gateway is true but no payments/transactions table exists → warning
+5. needs_payment_gateway is false (COD) → do NOT flag missing payments table, this is correct
+6. A screen has api_calls but no matching endpoint exists in backend.api_endpoints → warning
+7. An endpoint has auth_required: false but also has a non-empty roles array → warning
+8. primary_color and background_color are both close to the same hue (contrast issue) → warning
+9. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" → warning
+10. ErrorScreen is missing from screens → suggestion
+
+Do NOT flag:
+- Missing post_mvp tables (these are intentionally excluded)
+- Wishlist/reviews tables missing (post_mvp)
+- Minor naming style differences
+- Registration fields vs database fields — these can differ by design
 
 Return ONLY valid JSON:
 {{
@@ -445,21 +522,25 @@ Return ONLY valid JSON:
     {{
       "severity": "<critical|warning|suggestion>",
       "category": "<screens|navigation|database|backend|architecture|design>",
-      "issue":    "<what is wrong>",
-      "fix":      "<how to fix it>"
+      "issue":    "<specific, concrete issue — reference actual values from the plan>",
+      "fix":      "<exact action to fix it>"
     }}
   ],
   "missing_info": ["<what the user never specified>"],
   "assumptions_made": ["<what the AI assumed>"],
-  "ai_notes": ["<general improvement tips>"]
+  "ai_notes": ["<general improvement tips — keep to 3 max>"]
 }}
+
+validation_passed must be true if there are zero critical errors.
 """
+
+# ── PLAN REPAIRER ────────────────────────────────────────────
 
 PLAN_REPAIRER = """
 You are a Flutter app plan repair agent.
 
-Fix the plan so it can pass validation. Keep the same product idea and do not invent unrelated features.
-Resolve every critical error and warning that can be fixed from the existing context.
+Fix the plan so it passes validation. Keep the same product idea and do not invent unrelated features.
+Resolve every critical error and warning listed below using the smallest possible change.
 
 Validation result:
 {validation_json}
@@ -467,7 +548,31 @@ Validation result:
 Current plan:
 {plan_json}
 
-Return ONLY the full corrected plan JSON using the same top-level structure as the input plan.
+REPAIR RULES:
+1. For "auth_required: false but roles non-empty" → patch that endpoint's roles to [].
+2. For "missing endpoint for screen api_call" → append the missing endpoint to backend.api_endpoints.
+3. For "cart_strategy mismatch" → patch flutter_architecture.cart_strategy to match what backend has.
+4. For "design color inconsistency" → patch design_system.primary_color to the user's specified color.
+5. For "missing ErrorScreen" → append a minimal ErrorScreen to screens and /error to navigation.routes.
+6. For "bottom_tab route not in routes" → append the missing route to navigation.routes.
+7. For "missing LoginScreen" → append LoginScreen to screens and /login to navigation.routes.
+8. Never remove existing screens or tables — only add or patch.
+
+Return ONLY valid JSON with small patches:
+{{
+  "summary": "<one sentence describing the repairs made>",
+  "patches": [
+    {{
+      "op":    "<set|append|remove>",
+      "path":  "<JSON Pointer e.g. /backend/api_endpoints>",
+      "value": <the corrected value>
+    }}
+  ]
+}}
+
+Use "append" to add items to arrays.
+Use "set" to overwrite a specific field or index.
+Return the minimum patches needed — do not return the full plan.
 """
 
 PLAN_PATCHER = """

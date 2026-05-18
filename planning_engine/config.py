@@ -42,6 +42,10 @@ GEMINI_JSON_RETRIES = int(os.getenv("GEMINI_JSON_RETRIES", "1"))
 # ── Pipeline ─────────────────────────────────────────────────
 # How many clarification questions to ask the user max
 MAX_CLARIFICATION_QUESTIONS = 5
+ASK_REQUIRED_STARTUP_QUESTIONS = (
+    os.getenv("ASK_REQUIRED_STARTUP_QUESTIONS", "true").lower()
+    in {"1", "true", "yes", "y"}
+)
 MAX_CLARIFICATION_ROUNDS = int(os.getenv("MAX_CLARIFICATION_ROUNDS", "2"))
 MIN_REQUIREMENT_COMPLETENESS = float(os.getenv("MIN_REQUIREMENT_COMPLETENESS", "0.75"))
 
@@ -71,6 +75,7 @@ FLUTTER_NAV_OPTIONS         = ["go_router", "auto_route", "navigator_2"]
 # ── Output ────────────────────────────────────────────────────
 OUTPUT_DIR          = "outputs"
 FINAL_PLAN_FILENAME = "master_plan.json"
+SUMMARY_FILENAME_SUFFIX = "_summary.json"
 
 # ── Logging ───────────────────────────────────────────────────
 VERBOSE = True   # Set False to suppress step-by-step logs

@@ -60,6 +60,11 @@ GEMINI_MODEL_FAST=gemini-2.5-flash
 GEMINI_MODEL_PRO=gemini-2.5-pro
 GEMINI_MAX_TOKENS=16384
 GEMINI_JSON_RETRIES=1
+MAX_CLARIFICATION_ROUNDS=2
+ASK_REQUIRED_STARTUP_QUESTIONS=true
+MIN_REQUIREMENT_COMPLETENESS=0.75
+MAX_VALIDATION_REPAIR_ATTEMPTS=2
+COST_LOG_FILENAME=llm_usage.json
 ```
 
 Or set it only for the current PowerShell session:
@@ -81,6 +86,8 @@ python main.py
 ```
 
 The CLI will prompt you to describe your app. Press Enter twice when done.
+Before planning, it asks simple basics like app name, target customers,
+first-version customer actions, and whether you need a shop owner area.
 
 ### Inline prompt
 
@@ -99,6 +106,29 @@ python main.py --prompt "Build a task manager app" --output my_app_plan.json
 ```bash
 python main.py --prompt "..." --quiet
 ```
+
+### Chat edit an existing plan
+
+```bash
+python main.py --edit-plan outputs/master_plan.json
+```
+
+Example chat edit:
+
+```text
+edit> update background color to black
+```
+
+The editor applies a small JSON patch, revalidates the plan, and rewrites both
+the full plan and concise summary.
+
+### Save files
+
+Each successful run saves:
+
+- `outputs/master_plan.json` — full validated plan.
+- `outputs/master_plan_summary.json` — concise user-facing summary.
+- `cast_calculation/llm_usage.json` — token and estimated cost log after each LLM call.
 
 ---
 
