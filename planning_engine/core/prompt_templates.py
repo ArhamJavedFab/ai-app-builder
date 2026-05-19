@@ -1,13 +1,13 @@
-# ============================================================
-# core/prompt_templates.py — Agent prompt templates
+﻿# ============================================================
+# core/prompt_templates.py â€” Agent prompt templates
 # ============================================================
 
-# ── INTENT ANALYZER ─────────────────────────────────────────
+# â”€â”€ INTENT ANALYZER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 INTENT_ANALYZER = """
 You are the Intent Analyzer for a Flutter app planning system.
 
-Analyze the following user prompt and return ONLY valid JSON — no markdown fences, no commentary.
+Analyze the following user prompt and return ONLY valid JSON â€” no markdown fences, no commentary.
 
 User prompt:
 \"\"\"{prompt}\"\"\"
@@ -44,10 +44,10 @@ Given this partial app understanding:
 And the original prompt:
 \"\"\"{prompt}\"\"\"
 
-Identify the MOST important missing details that would significantly change the architecture or features.
-Ask at most {max_questions} questions, only what is truly ambiguous.
-Ask open-ended questions. Do not offer multiple-choice options.
-Put short answer hints in examples, which will be shown to the user as "(e.g. ...)".
+Identify only missing details that change screens or data.
+Ask at most {max_questions} short questions.
+Each question must ask one thing only.
+Put short hints in examples, shown as "(e.g. ...)".
 
 Return ONLY valid JSON:
 {{
@@ -55,14 +55,64 @@ Return ONLY valid JSON:
   "questions": [
     {{
       "id":      "q1",
-      "question": "<clear, specific question>",
-      "why":      "<one sentence: why this matters for architecture>",
+      "question": "<short question>",
       "examples": ["<short example answer>", "<another short example answer>"]
     }}
   ]
 }}
 
 If the prompt is detailed enough, set needs_clarification to false and return empty questions array.
+"""
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    STARTUP_QUESTION_GENERATOR    ///////////////////////////////////////////
+STARTUP_QUESTION_GENERATOR = """
+You are generating the first required clarification questions for a Flutter app planning CLI.
+
+User prompt:
+\"\"\"{prompt}\"\"\"
+
+Current intent:
+{intent_json}
+
+Suggested app name:
+{suggested_name}
+
+Return ONLY valid JSON:
+{{
+  "questions": [
+    {{
+      "id": "app_name",
+      "question": "What is the app name?",
+      "examples": ["{suggested_name}"],
+      "default_answer": "{suggested_name}"
+    }},
+    {{
+      "id": "target_users",
+      "question": "Who will use this app?",
+      "examples": ["<domain-specific user group>", "<another domain-specific user group>"]
+    }},
+    {{
+      "id": "mvp_scope",
+      "question": "What features come first?",
+      "examples": ["<domain-specific MVP scope>", "use sensible defaults"]
+    }},
+    {{
+      "id": "management_scope",
+      "question": "Is this personal or shared?",
+      "examples": ["<domain-specific answer>", "use sensible defaults"]
+    }}
+  ]
+}}
+
+Rules:
+- The examples MUST match the user's app idea and domain.
+- Do not use generic school, employee, manager, ecommerce, or attendance examples unless the user prompt is actually about that domain.
+- Use full-sentence questions, 5 to 6 words.
+- Each question asks exactly one thing.
+- Do not include a why field.
+- Keep exactly these 4 ids: app_name, target_users, mvp_scope, management_scope.
+- The first question must include default_answer.
 """
 
 REQUIREMENT_COMPLETENESS_AUDITOR = """
@@ -90,18 +140,22 @@ Return ONLY valid JSON:
   "questions": [
     {{
       "id": "q1",
-      "question": "<clear question that removes one important ambiguity>",
-      "why": "<why this changes the generated plan>",
+      "question": "<short question that asks one thing>",
       "examples": ["<short example answer>", "<another short example answer>"]
     }}
   ]
 }}
 
-Ask at most {max_questions} questions. Prefer grouped, open-ended questions with useful examples.
-Do not offer multiple-choice options. The user should be able to freely answer in their own words.
+Ask at most {max_questions} questions.
+Each question must ask one thing only.
+Do not include a why field.
+Keep questions short and clear.
 """
 
-# ── FEATURE PLANNER ──────────────────────────────────────────
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////     FEATURE PLANNER    ///////////////////////////////////////////
+
 
 FEATURE_PLANNER = """
 You are a Feature Planning agent for a Flutter app.
@@ -139,7 +193,9 @@ Rules:
 - Keep the MVP focused on the clarified scope; do not add seller marketplace features unless admin/store management was requested.
 """
 
-# ── SCREEN PLANNER ───────────────────────────────────────────
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    SCREEN PLANNER    ///////////////////////////////////////////
 
 SCREEN_PLANNER = """
 You are a Screen Planning agent for a Flutter app.
@@ -152,15 +208,15 @@ Features:
 
 For every feature, generate the Flutter screens needed.
 Also include: onboarding flow, splash screen, error screens.
-Think like a Flutter developer — name screens with "Screen" suffix.
+Think like a Flutter developer â€” name screens with "Screen" suffix.
 Use Riverpod-style names in state_needed by default, e.g. AuthProvider,
 ProductProvider, CartProvider. Do not use Bloc names unless the app context
 explicitly asks for bloc.
-Set api_calls to stable logical actions such as "GET /api/v1/products";
-these must be real endpoint paths that a backend planner can implement.
+Set api_calls to Firebase SDK actions such as "Firestore: read meals" or
+"Firebase Auth: sign in". Do not use REST paths like /api/v1.
 
 IMPORTANT RULES:
-- Every screen must have a unique name — never duplicate screen names.
+- Every screen must have a unique name â€” never duplicate screen names.
 - Every screen must have a non-empty route path (e.g. /home, /product/:id).
 - Include an ErrorScreen with route /error.
 - Include a SplashScreen with route /splash.
@@ -180,7 +236,7 @@ Return ONLY valid JSON:
       "bottom_sheets": ["<BottomSheetName>", ...],
       "dialogs":     ["<DialogName>", ...],
       "state_needed": ["<ProviderName>", ...],
-      "api_calls":   ["<GET|POST|etc /api/v1/path>", ...],
+      "api_calls":   ["<Firebase SDK action>", ...],
       "notes":       "<any Flutter-specific notes>"
     }}
   ],
@@ -194,8 +250,8 @@ Return ONLY valid JSON:
 }}
 """
 
-# ── NAVIGATION PLANNER ───────────────────────────────────────
-
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    NAVIGATION PLANNER    ///////////////////////////////////////////
 NAVIGATION_PLANNER = """
 You are a Navigation Planning agent for Flutter (using go_router).
 
@@ -220,7 +276,7 @@ Return ONLY valid JSON:
     {{
       "label": "<Tab label>",
       "icon":  "<material icon name>",
-      "route": "<route path — must exist in routes array>"
+      "route": "<route path â€” must exist in routes array>"
     }}
   ],
   "routes": [
@@ -240,7 +296,8 @@ Return ONLY valid JSON:
 }}
 """
 
-# ── BACKEND PLANNER ──────────────────────────────────────────
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    BACKEND PLANNER    ///////////////////////////////////////////
 
 BACKEND_PLANNER = """
 You are a Backend Planning agent for a Flutter app.
@@ -251,57 +308,56 @@ App context:
 Features:
 {features_json}
 
-Screens (every api_call listed here must have a matching endpoint below):
+Screens:
 {screens_json}
 
-Design the complete backend requirements.
+Design Firebase backend requirements.
 
 CRITICAL RULES:
-- Generate an API endpoint for EVERY api_call path listed in any screen above.
-- For public listing endpoints (e.g. GET /api/v1/products), set auth_required: false AND roles: [].
-  Never put roles on an endpoint that has auth_required: false.
-- For protected endpoints, set auth_required: true and list the allowed roles.
-- Always include: GET /api/v1/user/profile and PATCH /api/v1/user/profile for profile screens.
-- If admin features exist, include admin endpoints with roles: ["admin"].
+- Use Firebase only.
+- backend_type must be "firebase".
+- auth_provider must be "firebase_auth".
+- Use Cloud Firestore for app data.
+- Use Firebase Storage only when files/images are needed.
+- Use FCM only when push notifications are needed.
+- Do not use REST, GraphQL, custom APIs, JWT, OAuth2, Supabase, FastAPI, Node APIs, or /api/v1 paths.
+- api_endpoints must be [] because Flutter talks to Firebase SDKs directly.
+- Describe Firebase services in firebase_services.
+- Describe Firestore rules in security_rules.
 - If COD (cash on delivery) is the payment method, set needs_payment_gateway: false.
-  Cart and orders still need endpoints but no Stripe/payment table is required.
 
 Return ONLY valid JSON:
 {{
-  "needs_backend":          true|false,
-  "backend_type":           "<rest|graphql|firebase|supabase>",
+  "needs_backend":          true,
+  "backend_type":           "firebase",
   "realtime":               true|false,
-  "realtime_reason":        "<why realtime is needed, or empty string>",
-  "auth_provider":          "<jwt|firebase_auth|supabase_auth|oauth2>",
+  "realtime_reason":        "<short reason, or empty string>",
+  "auth_provider":          "firebase_auth",
   "auth_methods":           ["<email_password>", ...],
-  "file_storage":           "<s3|cloudinary|firebase_storage|supabase_storage|none>",
+  "file_storage":           "<firebase_storage|none>",
   "push_notifications":     true|false,
-  "push_provider":          "<fcm|onesignal|none>",
+  "push_provider":          "<fcm|none>",
   "caching":                true|false,
   "background_jobs":        true|false,
   "needs_payment_gateway":  true|false,
   "payment_method":         "<stripe|cod|none>",
+  "firebase_services":      ["firebase_auth", "cloud_firestore"],
+  "firestore_collections":  ["<collection name>", ...],
+  "security_rules":         ["<short Firestore/Auth rule>", ...],
   "third_party_apis": [
     {{
       "name":    "<API name>",
-      "purpose": "<why needed>",
+      "purpose": "<short purpose>",
       "url":     "<docs url if known>"
     }}
   ],
-  "api_endpoints": [
-    {{
-      "method":        "<GET|POST|PUT|DELETE|PATCH>",
-      "path":          "<e.g. /api/v1/users>",
-      "purpose":       "<what it does>",
-      "auth_required": true|false,
-      "roles":         ["<role — only when auth_required is true, else empty array []>"]
-    }}
-  ],
-  "environment_variables": ["<VAR_NAME>", ...]
+  "api_endpoints": [],
+  "environment_variables": ["FIREBASE_API_KEY", "FIREBASE_PROJECT_ID", "FIREBASE_APP_ID"]
 }}
 """
 
-# ── DATABASE PLANNER ─────────────────────────────────────────
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    DATABASE PLANNER    ///////////////////////////////////////////
 
 DATABASE_PLANNER = """
 You are a Database Planning agent for a Flutter app.
@@ -315,31 +371,28 @@ Features:
 Backend config:
 {backend_json}
 
-Design the complete database schema.
+Design the complete Firestore schema.
 
 CRITICAL RULES:
-- If needs_payment_gateway is false (e.g. COD), include an "orders" table but NOT a "payments" table.
-- If needs_payment_gateway is true, include BOTH "orders" AND "payments" tables.
-- Include a table for every major MVP feature module:
-  * ecommerce: users, products, categories, cart_items, orders, order_items, addresses
-  * auth: users table always required
-  * admin features: no extra table needed, use role field in users
-- For product variants (size, color, age_range), add a "product_variants" table.
-- Do NOT add tables for post_mvp features — keep the schema focused on MVP.
-- Cart strategy: use server-side cart (cart_items table linked to user) as the default.
-  Only use local-only cart if the backend explicitly has no cart endpoint.
+- Use Firebase Cloud Firestore only.
+- database_type must be "firestore".
+- Treat "tables" as Firestore collections for compatibility.
+- Include one collection for every major MVP data area.
+- Include a users collection when auth is needed.
+- Do not use PostgreSQL, MySQL, SQLite, Supabase, REST, JWT, or custom API assumptions.
+- Do not add collections for post-MVP features unless required by MVP auth/profile data.
 
 Return ONLY valid JSON:
 {{
-  "database_type": "<postgresql|mysql|sqlite|firestore|supabase_postgres>",
+  "database_type": "firestore",
   "tables": [
     {{
-      "name": "<table name>",
-      "purpose": "<what this table stores>",
+      "name": "<collection name>",
+      "purpose": "<what this collection stores>",
       "fields": [
         {{
           "name":     "<field name>",
-          "type":     "<String|int|double|bool|DateTime|uuid>",
+          "type":     "<String|int|double|bool|Timestamp|DocumentReference|List|Map>",
           "nullable": true|false,
           "unique":   false,
           "notes":    ""
@@ -355,11 +408,12 @@ Return ONLY valid JSON:
       "indexes": ["<field to index>"]
     }}
   ],
-  "local_cache_strategy": "<which tables to cache locally in Isar/Hive and why>"
+  "local_cache_strategy": "<short Firebase offline persistence/cache note>"
 }}
 """
 
-# ── ARCHITECTURE PLANNER ─────────────────────────────────────
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    ARCHITECTURE PLANNER    ///////////////////////////////////////////
 
 ARCHITECTURE_PLANNER = """
 You are a Flutter Architecture Planning agent.
@@ -371,12 +425,15 @@ Complexity and features:
 {features_json}
 
 Design the complete Flutter architecture.
-Be specific — a junior Flutter developer should be able to follow this plan.
+Be specific â€” a junior Flutter developer should be able to follow this plan.
 
 CRITICAL RULES:
-- Choose ONE cart storage strategy: either local (Isar/Hive) OR server-side (API).
-  Do not mix them. If the backend has cart endpoints, use server-side. Otherwise use local.
-- Do not include both "hive" and a server cart in dependencies — pick one.
+- Use Firebase SDKs for backend access.
+- Do not use Dio, HTTP, Chopper, custom REST APIs, JWT, or manual token storage.
+- Include firebase_core, firebase_auth, and cloud_firestore dependencies.
+- Include firebase_storage only if file uploads/images are needed.
+- Include firebase_messaging only if push notifications are needed.
+- Use Firestore offline persistence for cached data.
 - State management must be consistent: if riverpod, use only Provider/Notifier naming,
   not Bloc/Cubit naming.
 - Every screen that shows user-specific data needs at least one provider in state_needed.
@@ -386,7 +443,7 @@ Return ONLY valid JSON:
   "state_management": "<riverpod|bloc|provider|getx|mobx>",
   "state_management_reason": "<why this choice>",
   "architecture_pattern": "<feature_first_clean_architecture|layered_clean_architecture|mvc|mvvm>",
-  "cart_strategy": "<local|server>",
+  "cart_strategy": "<firestore|local>",
   "folder_structure": [
     {{
       "path":    "<e.g. lib/features/auth/>",
@@ -394,8 +451,8 @@ Return ONLY valid JSON:
     }}
   ],
   "navigation_package": "<go_router|auto_route>",
-  "network_layer": "<dio|http|chopper>",
-  "local_database": "<isar|hive|sqflite|drift>",
+  "network_layer": "firebase_sdk",
+  "local_database": "firestore_offline_cache",
   "offline_first": true|false,
   "modular": true|false,
   "flavors": ["dev", "staging", "prod"],
@@ -421,7 +478,7 @@ Return ONLY valid JSON:
     "recommended_packages": ["mockito", "flutter_test"]
   }},
   "security_rules": [
-    "<e.g. Store tokens in flutter_secure_storage, never SharedPreferences>"
+    "<e.g. Use Firebase Auth state and Firestore security rules>"
   ],
   "performance_notes": [
     "<e.g. Use ListView.builder for all lists, never ListView with children>"
@@ -432,7 +489,9 @@ Return ONLY valid JSON:
 }}
 """
 
-# ── DESIGN SYSTEM PLANNER ────────────────────────────────────
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    DESIGN SYSTEM PLANNER    ///////////////////////////////////////////
 
 DESIGN_SYSTEM_PLANNER = """
 You are a Flutter UI/UX Design System agent.
@@ -443,7 +502,7 @@ App context:
 App type: {app_type}
 Target users: {target_users}
 
-User's branding preferences (from clarifications — MUST be respected):
+User's branding preferences (from clarifications â€” MUST be respected):
 {branding_notes}
 
 Design a complete Flutter design system.
@@ -459,9 +518,9 @@ CRITICAL RULES:
 Return ONLY valid JSON:
 {{
   "theme":             "<modern_minimal|playful|professional|luxury|bold_editorial|soft_pastel|dark_techy>",
-  "primary_color":     "<hex — user's accent color if specified>",
+  "primary_color":     "<hex â€” user's accent color if specified>",
   "secondary_color":   "<hex>",
-  "background_color":  "<hex — user's background color if specified>",
+  "background_color":  "<hex â€” user's background color if specified>",
   "surface_color":     "<hex>",
   "error_color":       "<hex>",
   "success_color":     "<hex>",
@@ -486,10 +545,11 @@ Return ONLY valid JSON:
 }}
 """
 
-# ── VALIDATION AGENT ─────────────────────────────────────────
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    VALIDATION PLANNER    ///////////////////////////////////////////
 
 VALIDATION_AGENT = """
-You are a Flutter App Plan Validator — the final quality gate.
+You are a Flutter App Plan Validator â€” the final quality gate.
 
 Review this complete app plan and identify real structural issues only.
 
@@ -497,22 +557,23 @@ Full Plan:
 {plan_json}
 
 Check ONLY for these concrete issues:
-1. Screen name appears more than once in the screens array → critical
-2. A route in bottom_tabs does not exist in the routes array → critical
-3. Auth provider is set but no LoginScreen exists in screens → critical
-4. needs_payment_gateway is true but no payments/transactions table exists → warning
-5. needs_payment_gateway is false (COD) → do NOT flag missing payments table, this is correct
-6. A screen has api_calls but no matching endpoint exists in backend.api_endpoints → warning
-7. An endpoint has auth_required: false but also has a non-empty roles array → warning
-8. primary_color and background_color are both close to the same hue (contrast issue) → warning
-9. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" → warning
-10. ErrorScreen is missing from screens → suggestion
+1. Screen name appears more than once in the screens array â†’ critical
+2. A route in bottom_tabs does not exist in the routes array â†’ critical
+3. Auth provider is set but no LoginScreen exists in screens â†’ critical
+4. needs_payment_gateway is true but no payments/transactions table exists â†’ warning
+5. needs_payment_gateway is false (COD) â†’ do NOT flag missing payments table, this is correct
+6. backend_type is not "firebase" or auth_provider is not "firebase_auth" â†’ critical
+7. If backend_type is "firebase", api_endpoints must be []; do not require endpoint matches for Firebase SDK api_calls
+8. primary_color and background_color are both close to the same hue (contrast issue) â†’ warning
+9. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" â†’ warning
+10. ErrorScreen is missing from screens â†’ suggestion
 
 Do NOT flag:
 - Missing post_mvp tables (these are intentionally excluded)
 - Wishlist/reviews tables missing (post_mvp)
 - Minor naming style differences
-- Registration fields vs database fields — these can differ by design
+- Registration fields vs database fields â€” these can differ by design
+- Firebase SDK api_calls without REST endpoints
 
 Return ONLY valid JSON:
 {{
@@ -522,19 +583,20 @@ Return ONLY valid JSON:
     {{
       "severity": "<critical|warning|suggestion>",
       "category": "<screens|navigation|database|backend|architecture|design>",
-      "issue":    "<specific, concrete issue — reference actual values from the plan>",
+      "issue":    "<specific, concrete issue â€” reference actual values from the plan>",
       "fix":      "<exact action to fix it>"
     }}
   ],
   "missing_info": ["<what the user never specified>"],
   "assumptions_made": ["<what the AI assumed>"],
-  "ai_notes": ["<general improvement tips — keep to 3 max>"]
+  "ai_notes": ["<general improvement tips â€” keep to 3 max>"]
 }}
 
 validation_passed must be true if there are zero critical errors.
 """
 
-# ── PLAN REPAIRER ────────────────────────────────────────────
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    PLAN REPAIRER    ///////////////////////////////////////////
 
 PLAN_REPAIRER = """
 You are a Flutter app plan repair agent.
@@ -549,14 +611,14 @@ Current plan:
 {plan_json}
 
 REPAIR RULES:
-1. For "auth_required: false but roles non-empty" → patch that endpoint's roles to [].
-2. For "missing endpoint for screen api_call" → append the missing endpoint to backend.api_endpoints.
-3. For "cart_strategy mismatch" → patch flutter_architecture.cart_strategy to match what backend has.
-4. For "design color inconsistency" → patch design_system.primary_color to the user's specified color.
-5. For "missing ErrorScreen" → append a minimal ErrorScreen to screens and /error to navigation.routes.
-6. For "bottom_tab route not in routes" → append the missing route to navigation.routes.
-7. For "missing LoginScreen" → append LoginScreen to screens and /login to navigation.routes.
-8. Never remove existing screens or tables — only add or patch.
+1. For "auth_required: false but roles non-empty" â†’ patch that endpoint's roles to [].
+2. For non-Firebase backend/auth â†’ set backend_type to "firebase", auth_provider to "firebase_auth", and api_endpoints to [].
+3. For "cart_strategy mismatch" â†’ patch flutter_architecture.cart_strategy to match what backend has.
+4. For "design color inconsistency" â†’ patch design_system.primary_color to the user's specified color.
+5. For "missing ErrorScreen" â†’ append a minimal ErrorScreen to screens and /error to navigation.routes.
+6. For "bottom_tab route not in routes" â†’ append the missing route to navigation.routes.
+7. For "missing LoginScreen" â†’ append LoginScreen to screens and /login to navigation.routes.
+8. Never remove existing screens or tables â€” only add or patch.
 
 Return ONLY valid JSON with small patches:
 {{
@@ -572,7 +634,7 @@ Return ONLY valid JSON with small patches:
 
 Use "append" to add items to arrays.
 Use "set" to overwrite a specific field or index.
-Return the minimum patches needed — do not return the full plan.
+Return the minimum patches needed â€” do not return the full plan.
 """
 
 PLAN_PATCHER = """

@@ -13,6 +13,7 @@ from core.app_name_suggester import suggest_app_name
 from core.prompt_templates import (
     CLARIFICATION_GENERATOR,
     REQUIREMENT_COMPLETENESS_AUDITOR,
+    STARTUP_QUESTION_GENERATOR,
 )
 import config
 
@@ -21,14 +22,13 @@ def _question_with_examples(q: dict) -> str:
     question = q.get("question", "")
     examples = q.get("examples") or q.get("options") or []
     if examples:
-        question = f"{question} (e.g. {', '.join(examples)})"
+        short_examples = [str(example)[:50] for example in examples[:2]]
+        question = f"{question} (e.g. {', '.join(short_examples)})"
     return question
 
 
 def _display_question(idx: int, q: dict) -> None:
     print(f"\n  ?  Q{idx}: {_question_with_examples(q)}")
-    if q.get("why"):
-        print(f"      Why: {q['why']}")
     if q.get("default_answer"):
         print(f"      Press Enter to use {q['default_answer']}, or type your own.")
 
@@ -44,75 +44,106 @@ def _ask_user(question: dict, idx: int) -> str:
         return raw
 
 
+QUESTION_TEXT_BY_ID = {
+    "app_name": "What is the app name?",
+    "target_users": "Who will use this app?",
+    "mvp_scope": "What features come first?",
+    "management_scope": "Is this personal or shared?",
+}
+
+
+def _normalize_question_text(question: dict) -> dict:
+    question_id = str(question.get("id", ""))
+    if question_id in QUESTION_TEXT_BY_ID:
+        question["question"] = QUESTION_TEXT_BY_ID[question_id]
+    return question
+
+
 def _required_startup_questions(prompt: str, intent: dict) -> list[dict]:
-    domain = (intent.get("domain") or "").lower()
     suggested_name = suggest_app_name(prompt, intent)
-    detected_modules = {
-        str(module).lower() for module in intent.get("detected_modules", [])
+    filled = STARTUP_QUESTION_GENERATOR.format(
+        prompt=prompt,
+        intent_json=json.dumps(intent, indent=2),
+        suggested_name=suggested_name,
+    )
+
+    try:
+        result = call_gemini_json(filled, use_pro=False)
+    except Exception:
+        return _fallback_required_startup_questions(prompt, intent, suggested_name)
+
+    questions = result.get("questions", []) if isinstance(result, dict) else []
+    if not isinstance(questions, list) or not questions:
+        return _fallback_required_startup_questions(prompt, intent, suggested_name)
+
+    expected_ids = ["app_name", "target_users", "mvp_scope", "management_scope"]
+    by_id = {
+        str(question.get("id", "")): question
+        for question in questions
+        if isinstance(question, dict)
     }
 
-    questions = [
+    ordered_questions: list[dict] = []
+    fallback_questions = {
+        q["id"]: q
+        for q in _fallback_required_startup_questions(prompt, intent, suggested_name)
+    }
+    for question_id in expected_ids:
+        question = by_id.get(question_id) or fallback_questions[question_id]
+        if question_id == "app_name":
+            question["default_answer"] = question.get("default_answer") or suggested_name
+            question["examples"] = question.get("examples") or [suggested_name]
+        ordered_questions.append(_normalize_question_text(question))
+    return ordered_questions
+
+
+def _fallback_required_startup_questions(
+    prompt: str,
+    intent: dict,
+    suggested_name: str,
+) -> list[dict]:
+    app_type = intent.get("app_type") or "this app"
+    users = intent.get("target_users") or ["people who need this app"]
+    modules = intent.get("detected_modules") or ["core tracking", "profile", "settings"]
+
+    user_examples = [str(user) for user in users[:3]]
+    if len(user_examples) < 3:
+        user_examples.append(f"people using {app_type}")
+    if len(user_examples) < 3:
+        user_examples.append("use sensible defaults")
+
+    module_text = ", ".join(str(module).lower() for module in modules[:3])
+    return [
         {
             "id": "app_name",
-            "question": "What should the app be called, or should I choose one?",
-            "why": "This helps the plan use the right brand name.",
+            "question": "What is the app name?",
             "examples": [suggested_name],
             "default_answer": suggested_name,
         },
         {
             "id": "target_users",
-            "question": "Who will mainly use this app?",
-            "why": "This helps choose the right pages, wording, and design style.",
-            "examples": [
-                "students and teachers",
-                "employees and managers",
-                "general users",
-            ],
+            "question": "Who will use this app?",
+            "examples": user_examples[:3],
         },
         {
             "id": "mvp_scope",
-            "question": "What should users be able to do in the first version?",
-            "why": "This keeps the plan focused on what you actually want first.",
+            "question": "What features come first?",
             "examples": [
-                "mark attendance, view history, and export reports",
-                "sign in, check in/out, and manage profile",
+                module_text,
+                "use the core features from my prompt",
                 "use sensible defaults",
             ],
         },
         {
-            "id": "admin_management",
-            "question": "Do you need an admin or manager area?",
-            "why": "This decides whether the plan should include role-based management screens.",
+            "id": "management_scope",
+            "question": "Is this personal or shared?",
             "examples": [
-                "yes, admins manage users and reports",
-                "manager approval only",
-                "no admin area in the first version",
+                "personal-only for now",
+                "include coach or reviewer access",
+                "use sensible defaults",
             ],
         },
     ]
-
-    if domain == "ecommerce" or {"cart", "products", "orders"} & detected_modules:
-        questions[1]["examples"] = [
-            "customers buying products",
-            "general customers",
-            "shop owners and customers",
-        ]
-        questions[2]["question"] = "What should customers be able to do in the first version?"
-        questions[2]["examples"] = [
-            "browse products, add to cart, order, and manage profile",
-            "browse products and contact me to order",
-            "use sensible defaults",
-        ]
-        questions[3]["id"] = "business_management"
-        questions[3]["question"] = "Do you want to manage products and orders inside the app?"
-        questions[3]["why"] = "This decides whether the plan should include a shop owner area."
-        questions[3]["examples"] = [
-            "yes, include a simple owner/admin area",
-            "customer app only for now",
-            "maybe later",
-        ]
-
-    return questions
 
 
 def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
@@ -136,8 +167,7 @@ def _fallback_questions(intent: dict) -> list[dict]:
         return [
             {
                 "id": "core_scope",
-                "question": "What are the must-have pages or actions for the first version?",
-                "why": "This keeps the plan focused on what you actually want built first.",
+                "question": "Must-have first-version actions?",
                 "examples": [
                     "use sensible defaults",
                     "home, account/profile, and settings",
@@ -149,10 +179,8 @@ def _fallback_questions(intent: dict) -> list[dict]:
         {
             "id": "products",
             "question": (
-                "What kind of products will you sell, and do they come in choices "
-                "like size, color, or age range?"
+                "Product type?"
             ),
-            "why": "This helps plan product pages, filters, and order details.",
             "examples": [
                 "clothing with size/color variants",
                 "simple products without variants",
@@ -160,8 +188,7 @@ def _fallback_questions(intent: dict) -> list[dict]:
         },
         {
             "id": "checkout",
-            "question": "How should customers place an order?",
-            "why": "This decides what the cart and checkout flow should include.",
+            "question": "Checkout method?",
             "examples": [
                 "online payment plus cash on delivery",
                 "cash on delivery only",
@@ -171,10 +198,8 @@ def _fallback_questions(intent: dict) -> list[dict]:
         {
             "id": "auth_profile",
             "question": (
-                "Should customers have an account with profile, addresses, order "
-                "history, and settings?"
+                "Customer accounts?"
             ),
-            "why": "This helps decide what should be inside the profile area.",
             "examples": [
                 "full customer account",
                 "guest checkout with optional account",
@@ -183,8 +208,7 @@ def _fallback_questions(intent: dict) -> list[dict]:
         },
         {
             "id": "store_admin",
-            "question": "Do you need a shop owner area to add products and see orders?",
-            "why": "This decides whether the plan includes owner-only pages.",
+            "question": "Owner area?",
             "examples": [
                 "include product and order management",
                 "customer app only",
@@ -193,8 +217,7 @@ def _fallback_questions(intent: dict) -> list[dict]:
         },
         {
             "id": "visual_direction",
-            "question": "What visual style should the app use?",
-            "why": "This helps choose colors, fonts, and the overall feeling of the app.",
+            "question": "Visual style?",
             "examples": [
                 "modern and high contrast",
                 "soft and minimal",

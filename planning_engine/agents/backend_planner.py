@@ -10,6 +10,36 @@ from core.prompt_templates import BACKEND_PLANNER
 import config
 
 
+def _enforce_firebase_backend(result: dict) -> dict:
+    firebase_services = set(result.get("firebase_services") or [])
+    firebase_services.update({"firebase_auth", "cloud_firestore"})
+
+    if result.get("file_storage") not in {"firebase_storage", "none"}:
+        result["file_storage"] = "none"
+    if result.get("file_storage") == "firebase_storage":
+        firebase_services.add("firebase_storage")
+
+    if result.get("push_notifications"):
+        result["push_provider"] = "fcm"
+        firebase_services.add("firebase_messaging")
+    else:
+        result["push_provider"] = "none"
+
+    result["needs_backend"] = True
+    result["backend_type"] = "firebase"
+    result["auth_provider"] = "firebase_auth"
+    result["api_endpoints"] = []
+    result["firebase_services"] = sorted(firebase_services)
+    result.setdefault("firestore_collections", [])
+    result.setdefault("security_rules", [])
+    result["environment_variables"] = [
+        "FIREBASE_API_KEY",
+        "FIREBASE_PROJECT_ID",
+        "FIREBASE_APP_ID",
+    ]
+    return result
+
+
 def plan_backend(intent: dict, features: dict, screens: dict | None = None) -> dict:
     """
     Stage 6 — Plan backend type, auth, APIs, storage, etc.
@@ -23,7 +53,7 @@ def plan_backend(intent: dict, features: dict, screens: dict | None = None) -> d
         features_json=json.dumps(features, indent=2),
         screens_json=json.dumps(screens or {}, indent=2),
     )
-    result = call_gemini_json(filled, use_pro=False)
+    result = _enforce_firebase_backend(call_gemini_json(filled, use_pro=False))
 
     if config.VERBOSE:
         backend_type = result.get("backend_type", "unknown")

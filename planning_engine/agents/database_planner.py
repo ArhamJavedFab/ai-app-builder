@@ -10,6 +10,16 @@ from core.prompt_templates import DATABASE_PLANNER
 import config
 
 
+def _enforce_firestore_database(result: dict) -> dict:
+    result["database_type"] = "firestore"
+    result.setdefault("tables", [])
+    result.setdefault(
+        "local_cache_strategy",
+        "Use Firestore offline persistence for local caching.",
+    )
+    return result
+
+
 def plan_database(intent: dict, features: dict, backend: dict) -> dict:
     """
     Stage 7 — Generate full database schema with tables, fields, relations.
@@ -23,7 +33,7 @@ def plan_database(intent: dict, features: dict, backend: dict) -> dict:
         features_json=json.dumps(features, indent=2),
         backend_json=json.dumps(backend, indent=2),
     )
-    result = call_gemini_json(filled, use_pro=False)
+    result = _enforce_firestore_database(call_gemini_json(filled, use_pro=False))
 
     if config.VERBOSE:
         tables = len(result.get("tables", []))

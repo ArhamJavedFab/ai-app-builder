@@ -10,6 +10,40 @@ from core.prompt_templates import ARCHITECTURE_PLANNER, DESIGN_SYSTEM_PLANNER
 import config
 
 
+def _dependency_names(dependencies: list[dict]) -> set[str]:
+    return {str(dep.get("package", "")).lower() for dep in dependencies}
+
+
+def _ensure_dependency(dependencies: list[dict], package: str, purpose: str) -> None:
+    if package.lower() in _dependency_names(dependencies):
+        return
+    dependencies.append({"package": package, "version": "latest", "purpose": purpose})
+
+
+def _enforce_firebase_architecture(result: dict, backend: dict | None = None) -> dict:
+    result["network_layer"] = "firebase_sdk"
+    result["local_database"] = "firestore_offline_cache"
+    if result.get("cart_strategy") == "server":
+        result["cart_strategy"] = "firestore"
+
+    dependencies = result.setdefault("flutter_dependencies", [])
+    _ensure_dependency(dependencies, "firebase_core", "Initialize Firebase in Flutter.")
+    _ensure_dependency(dependencies, "firebase_auth", "Firebase Authentication.")
+    _ensure_dependency(dependencies, "cloud_firestore", "Cloud Firestore data access.")
+
+    firebase_services = set((backend or {}).get("firebase_services", []))
+    if "firebase_storage" in firebase_services:
+        _ensure_dependency(dependencies, "firebase_storage", "Firebase Storage uploads.")
+    if "firebase_messaging" in firebase_services:
+        _ensure_dependency(dependencies, "firebase_messaging", "FCM push notifications.")
+
+    result["flutter_dependencies"] = [
+        dep for dep in dependencies
+        if str(dep.get("package", "")).lower() not in {"dio", "http", "chopper", "flutter_secure_storage"}
+    ]
+    return result
+
+
 def plan_architecture(intent: dict, features: dict, backend: dict | None = None) -> dict:
     """
     Stage 8a — Plan Flutter architecture.
@@ -33,7 +67,7 @@ def plan_architecture(intent: dict, features: dict, backend: dict | None = None)
         intent_json=json.dumps(augmented_intent, indent=2),
         features_json=json.dumps(features, indent=2),
     )
-    result = call_gemini_json(filled, use_pro=True)
+    result = _enforce_firebase_architecture(call_gemini_json(filled, use_pro=True), backend)
 
     if config.VERBOSE:
         state  = result.get("state_management", "unknown")

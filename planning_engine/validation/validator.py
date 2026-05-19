@@ -39,12 +39,26 @@ def _rule_based_checks(plan: dict) -> list[dict]:
     routes         = {r.get("path", "") for r in nav.get("routes", [])}
     tab_routes     = {t.get("route", "") for t in nav.get("bottom_tabs", [])}
     backend        = plan.get("backend", {})
+    backend_type   = backend.get("backend_type", "")
     tables         = {t.get("name", "").lower() for t in plan.get("database_tables", [])}
     arch           = plan.get("flutter_architecture", {})
     design         = plan.get("design_system", {})
 
     # Collect all endpoint paths for cross-referencing
     endpoints      = {e.get("path", "") for e in backend.get("api_endpoints", [])}
+
+    if backend_type and backend_type != "firebase":
+        issues.append(_issue(
+            "critical", "backend",
+            f"backend_type is '{backend_type}', but this planner must use Firebase.",
+            "Set backend.backend_type to 'firebase'.",
+        ))
+    if backend.get("auth_provider") not in ("", "firebase_auth"):
+        issues.append(_issue(
+            "critical", "backend",
+            f"auth_provider is '{backend.get('auth_provider')}', but this planner must use Firebase Auth.",
+            "Set backend.auth_provider to 'firebase_auth'.",
+        ))
 
     # ── 1. Duplicate screen names ─────────────────────────────
     seen = {}
@@ -107,7 +121,7 @@ def _rule_based_checks(plan: dict) -> list[dict]:
 
     # ── 6. Missing profile endpoint ───────────────────────────
     has_profile_screen = any("profile" in n.lower() for n in screen_names)
-    if has_profile_screen:
+    if has_profile_screen and backend_type != "firebase":
         has_profile_endpoint = any(
             "profile" in p.lower() or "user" in p.lower()
             for p in endpoints
@@ -120,7 +134,7 @@ def _rule_based_checks(plan: dict) -> list[dict]:
             ))
 
     # ── 7. Screen api_calls without matching endpoint ─────────
-    for screen in screens:
+    for screen in ([] if backend_type == "firebase" else screens):
         for call in screen.get("api_calls", []):
             # Extract just the path part (e.g. "GET /api/v1/products" → "/api/v1/products")
             parts = call.strip().split()

@@ -22,7 +22,7 @@ planning_engine/
 │   ├── feature_planner.py     # Stage 3: Feature modules + MVP vs post-MVP
 │   ├── screen_planner.py      # Stage 4: Flutter screens + reusable widgets
 │   ├── navigation_planner.py  # Stage 5: go_router routes, bottom tabs, guards
-│   ├── backend_planner.py     # Stage 6: REST/Firebase, auth, APIs, storage
+│   ├── backend_planner.py     # Stage 6: Firebase Auth, Firestore, Storage, FCM
 │   ├── database_planner.py    # Stage 7: Tables, fields, relations, indexes
 │   └── architecture_planner.py # Stage 8: State mgmt, folder structure, deps, design
 │
@@ -159,7 +159,7 @@ User Prompt
     │
     ▼
 [Stage 6] Backend Planner          — Gemini Flash
-    │  REST/Firebase/Supabase, auth, APIs, env vars
+    │  Firebase Auth, Firestore, Storage, FCM, env vars
     │
     ▼
 [Stage 7] Database Planner         — Gemini Flash
@@ -193,8 +193,8 @@ The output is optimized for Flutter code generation. Key sections:
 | `flutter_architecture` | State management, folder structure, packages |
 | `design_system` | Colors, fonts, spacing — directly maps to ThemeData |
 | `flutter_dependencies` | pubspec.yaml dependencies (with versions) |
-| `database_tables` | Isar/Hive local models or backend schema |
-| `backend.api_endpoints` | API service layer generation |
+| `database_tables` | Firestore collections and document fields |
+| `backend.firebase_services` | Firebase service setup |
 | `testing_strategy` | Test file scaffolding |
 
 See `outputs/sample_plan.json` for a complete example (food delivery app).
@@ -232,5 +232,5 @@ The `master_plan.json` output is designed to feed directly into:
 
 - **Design Agent** → generates Flutter screen layouts, widget trees, ThemeData
 - **Build Agent** → generates actual `.dart` files using feature-first clean architecture
-- **Backend Agent** → generates FastAPI/Node routes from `api_endpoints`
-- **Database Agent** → generates Isar schemas or SQL migrations from `database_tables`
+- **Backend Agent** → generates Firebase Auth, Firestore, Storage, and FCM requirements
+- **Database Agent** → generates Firestore collections and document fields from `database_tables`

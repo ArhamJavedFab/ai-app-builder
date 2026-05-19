@@ -75,10 +75,10 @@ class DatabaseTable:
 @dataclass
 class BackendRequirements:
     needs_backend: bool         = True
-    backend_type: str           = "rest"              # rest | graphql | firebase | supabase
+    backend_type: str           = "firebase"
     realtime: bool              = False
-    auth_provider: str          = "jwt"               # jwt | firebase_auth | supabase_auth
-    file_storage: str           = ""                  # s3 | cloudinary | firebase_storage
+    auth_provider: str          = "firebase_auth"
+    file_storage: str           = "none"
     push_notifications: bool    = False
     third_party_apis: list      = field(default_factory=list)
     caching: bool               = False

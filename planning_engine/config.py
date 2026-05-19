@@ -78,7 +78,7 @@ FLUTTER_ARCH_OPTIONS        = [
     "mvc",
     "mvvm",
 ]
-FLUTTER_NETWORK_OPTIONS     = ["dio", "http", "chopper"]
+FLUTTER_NETWORK_OPTIONS     = ["firebase"]
 FLUTTER_LOCAL_DB_OPTIONS    = ["isar", "hive", "sqflite", "drift"]
 FLUTTER_NAV_OPTIONS         = ["go_router", "auto_route", "navigator_2"]
 
