@@ -195,7 +195,10 @@ def _validate_and_repair(plan: MasterPlan) -> None:
         )
 
 
-def run_planning_pipeline(user_prompt: str) -> MasterPlan:
+def run_planning_pipeline(
+    user_prompt: str,
+    startup_clarifications: dict | None = None,
+) -> MasterPlan:
     """
     Runs the full multi-agent planning pipeline.
     Returns a populated MasterPlan instance.
@@ -217,18 +220,27 @@ def run_planning_pipeline(user_prompt: str) -> MasterPlan:
 
     # ── Stage 2: Clarification ───────────────────────────────
     _separator("Requirement Clarification")
-    clarifications = _run_required_stage(
-        "Required Startup Questions",
-        ask_required_startup_questions,
-        user_prompt,
-        intent,
-    )
+    # FASTAPI WEB CHAT SUPPORT:
+    # When startup_clarifications is provided, the frontend already asked
+    # these questions, so skip terminal input(). CLI behavior stays unchanged.
+    if startup_clarifications is None:
+        clarifications = _run_required_stage(
+            "Required Startup Questions",
+            ask_required_startup_questions,
+            user_prompt,
+            intent,
+        )
+    else:
+        clarifications = dict(startup_clarifications)
     confidence = intent.get("confidence", 1.0)
     force_clarification = (
         confidence < config.MIN_INTENT_CONFIDENCE
         or _prompt_needs_clarification(user_prompt, intent)
     )
-    if force_clarification:
+    # FASTAPI WEB CHAT SUPPORT:
+    # Extra clarification currently uses terminal input(), so the web path
+    # only uses the startup questions already collected in the frontend.
+    if force_clarification and startup_clarifications is None:
         clarifications = _run_required_stage(
             "Requirement Clarification",
             extract_requirements,

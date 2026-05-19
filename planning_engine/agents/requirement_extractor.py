@@ -161,6 +161,33 @@ def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
     return answers
 
 
+# FASTAPI WEB CHAT HELPERS:
+# These helpers expose the same startup questions without calling input().
+# The CLI path above is unchanged and still asks questions in the terminal.
+def build_required_startup_questions(prompt: str, intent: dict) -> list[dict]:
+    if not config.ASK_REQUIRED_STARTUP_QUESTIONS:
+        return []
+    return _required_startup_questions(prompt, intent)
+
+
+# FASTAPI WEB CHAT HELPERS:
+# Convert frontend answers into the same clarifications shape used by the CLI.
+def build_startup_answers(questions: list[dict], raw_answers: dict[str, str]) -> dict:
+    answers = {}
+    for question in questions:
+        question_id = question.get("id", "")
+        answer = str(raw_answers.get(question_id, "")).strip()
+        if not answer and question.get("default_answer"):
+            answer = str(question["default_answer"])
+        if not answer:
+            continue
+        answers[question_id] = {
+            "question": question.get("question", ""),
+            "answer": answer,
+        }
+    return answers
+
+
 def _fallback_questions(intent: dict) -> list[dict]:
     domain = (intent.get("domain") or "").lower()
     if domain != "ecommerce":

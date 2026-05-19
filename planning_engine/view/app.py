@@ -15,6 +15,11 @@ if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
 import config
+from agents.intent_analyzer import analyze_intent
+from agents.requirement_extractor import (
+    build_required_startup_questions,
+    build_startup_answers,
+)
 from cast_calculation.usage_tracker import (
     finish_usage_run,
     format_cost_summary,
@@ -27,6 +32,19 @@ from view.plan_highlights import build_plain_language_highlights
 
 class GenerateRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=8000)
+    intent: dict[str, Any] | None = None
+    questions: list[dict[str, Any]] = Field(default_factory=list)
+    answers: dict[str, str] = Field(default_factory=dict)
+
+
+class StartRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=8000)
+
+
+class StartResponse(BaseModel):
+    prompt: str
+    intent: dict[str, Any]
+    questions: list[dict[str, Any]]
 
 
 class GenerateResponse(BaseModel):
@@ -56,6 +74,34 @@ async def favicon() -> Response:
     return Response(status_code=204)
 
 
+# FASTAPI WEB CHAT FLOW:
+# Step 1 asks Gemini for prompt-specific clarification questions and returns
+# them to the browser. Nothing calls terminal input() in this route.
+@app.post("/api/start", response_model=StartResponse)
+async def start_plan(payload: StartRequest) -> StartResponse:
+    if config.GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
+        raise HTTPException(
+            status_code=400,
+            detail="GEMINI_API_KEY is not set in planning_engine/.env.",
+        )
+
+    run_id = start_usage_run("web_question_generation", {"source": "fastapi_view"})
+    try:
+        config.VERBOSE = False
+        prompt = payload.prompt.strip()
+        intent = analyze_intent(prompt)
+        questions = build_required_startup_questions(prompt, intent)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        finish_usage_run(run_id)
+
+    return StartResponse(prompt=prompt, intent=intent, questions=questions)
+
+
+# FASTAPI WEB CHAT FLOW:
+# Step 2 receives answers collected by the browser and runs the same pipeline
+# with startup_clarifications, so the CLI input() question function is skipped.
 @app.post("/api/generate", response_model=GenerateResponse)
 async def generate_plan(payload: GenerateRequest) -> GenerateResponse:
     if config.GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
@@ -67,7 +113,11 @@ async def generate_plan(payload: GenerateRequest) -> GenerateResponse:
     run_id = start_usage_run("web_planning_pipeline", {"source": "fastapi_view"})
     try:
         config.VERBOSE = False
-        master_plan = run_planning_pipeline(payload.prompt.strip())
+        clarifications = build_startup_answers(payload.questions, payload.answers)
+        master_plan = run_planning_pipeline(
+            payload.prompt.strip(),
+            startup_clarifications=clarifications,
+        )
         os.makedirs(config.OUTPUT_DIR, exist_ok=True)
         output_path = os.path.join(config.OUTPUT_DIR, config.FINAL_PLAN_FILENAME)
         master_plan.save(output_path)
