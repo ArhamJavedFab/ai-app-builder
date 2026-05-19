@@ -581,8 +581,8 @@ You are a JSON patch editor for a Flutter app master plan.
 User request:
 \"\"\"{instruction}\"\"\"
 
-Current plan JSON:
-{plan_json}
+Relevant plan context only:
+{plan_context}
 
 Return ONLY valid JSON:
 {{
@@ -601,4 +601,5 @@ Rules:
 - Supported ops are "set", "append", and "remove".
 - For simple changes, return the smallest possible patch.
 - Do not return a full plan.
+- The context may include only relevant sections, but paths must target the full master plan.
 """

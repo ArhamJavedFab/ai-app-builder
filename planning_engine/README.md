@@ -110,7 +110,7 @@ python main.py --prompt "..." --quiet
 ### Chat edit an existing plan
 
 ```bash
-python main.py --edit-plan outputs/master_plan.json
+python main.py --edit-plan planning_engine/outputs/master_plan.json
 ```
 
 Example chat edit:
@@ -126,9 +126,9 @@ the full plan and concise summary.
 
 Each successful run saves:
 
-- `outputs/master_plan.json` — full validated plan.
-- `outputs/master_plan_summary.json` — concise user-facing summary.
-- `cast_calculation/llm_usage.json` — token and estimated cost log after each LLM call.
+- `planning_engine/outputs/master_plan.json` — full validated plan.
+- `planning_engine/outputs/master_plan_summary.json` — concise user-facing summary.
+- `planning_engine/cast_calculation/llm_usage.json` — token and estimated cost log grouped by run, with each run total and an `all_runs_total` final summary.
 
 ---
 
@@ -177,7 +177,7 @@ User Prompt
     │  rule-based checks + LLM audit
     │
     ▼
-Master Plan JSON  →  outputs/master_plan.json
+Master Plan JSON  →  planning_engine/outputs/master_plan.json
 ```
 
 ---

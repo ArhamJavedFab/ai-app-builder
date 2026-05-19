@@ -1,0 +1,295 @@
+{
+  "runs": [
+    {
+      "run_id": "legacy_import",
+      "label": "legacy_import",
+      "started_at": "2026-05-18T10:23:26.644729+00:00",
+      "ended_at": "2026-05-18T12:30:43.618705+00:00",
+      "metadata": {
+        "source": "pre-run-grouped log"
+      },
+      "calls": [
+        {
+          "timestamp": "2026-05-18T10:23:26.644729+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 2562,
+          "output_characters": 2310,
+          "input_tokens": 714,
+          "output_tokens": 559,
+          "total_tokens": 3276,
+          "estimated_cost_usd": 0.0016117,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T10:27:20.437266+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 3677,
+          "output_characters": 1975,
+          "input_tokens": 987,
+          "output_tokens": 474,
+          "total_tokens": 3955,
+          "estimated_cost_usd": 0.0014811,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T10:27:42.484106+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 3375,
+          "output_characters": 12005,
+          "input_tokens": 942,
+          "output_tokens": 2966,
+          "total_tokens": 5927,
+          "estimated_cost_usd": 0.0076976,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T10:28:15.453792+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 15801,
+          "output_characters": 23687,
+          "input_tokens": 4006,
+          "output_tokens": 6605,
+          "total_tokens": 11834,
+          "estimated_cost_usd": 0.0177143,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:05:01.099226+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 1077,
+          "output_characters": 768,
+          "input_tokens": 308,
+          "output_tokens": 220,
+          "total_tokens": 1019,
+          "estimated_cost_usd": 0.0006424,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:07:25.717949+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 1080,
+          "output_characters": 742,
+          "input_tokens": 308,
+          "output_tokens": 233,
+          "total_tokens": 1072,
+          "estimated_cost_usd": 0.0006749,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:16:23.916978+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 1077,
+          "output_characters": 826,
+          "input_tokens": 308,
+          "output_tokens": 253,
+          "total_tokens": 1099,
+          "estimated_cost_usd": 0.0007249,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:25:57.171843+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 1080,
+          "output_characters": 735,
+          "input_tokens": 308,
+          "output_tokens": 238,
+          "total_tokens": 996,
+          "estimated_cost_usd": 0.0006874,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:27:37.248842+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 2439,
+          "output_characters": 2513,
+          "input_tokens": 687,
+          "output_tokens": 575,
+          "total_tokens": 3969,
+          "estimated_cost_usd": 0.0016436,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:33:22.499346+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 3523,
+          "output_characters": 2180,
+          "input_tokens": 954,
+          "output_tokens": 501,
+          "total_tokens": 3965,
+          "estimated_cost_usd": 0.0015387,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:33:40.632013+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 3274,
+          "output_characters": 7033,
+          "input_tokens": 919,
+          "output_tokens": 1826,
+          "total_tokens": 5192,
+          "estimated_cost_usd": 0.0048407,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:34:04.911077+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 10264,
+          "output_characters": 15266,
+          "input_tokens": 2734,
+          "output_tokens": 4229,
+          "total_tokens": 8364,
+          "estimated_cost_usd": 0.0113927,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:34:13.265585+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 17210,
+          "output_characters": 3117,
+          "input_tokens": 4813,
+          "output_tokens": 928,
+          "total_tokens": 6681,
+          "estimated_cost_usd": 0.0037639,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:34:35.908388+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 25877,
+          "output_characters": 8510,
+          "input_tokens": 7077,
+          "output_tokens": 2642,
+          "total_tokens": 12392,
+          "estimated_cost_usd": 0.0087281,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:34:56.423858+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 18707,
+          "output_characters": 7879,
+          "input_tokens": 5359,
+          "output_tokens": 2086,
+          "total_tokens": 9729,
+          "estimated_cost_usd": 0.0068227,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:35:37.421845+00:00",
+          "model": "gemini-2.5-pro",
+          "success": true,
+          "input_characters": 10745,
+          "output_characters": 9733,
+          "input_tokens": 2915,
+          "output_tokens": 2724,
+          "total_tokens": 8029,
+          "estimated_cost_usd": 0.0076845,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:35:48.097833+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 2723,
+          "output_characters": 958,
+          "input_tokens": 830,
+          "output_tokens": 341,
+          "total_tokens": 3003,
+          "estimated_cost_usd": 0.0011015,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T11:36:19.577981+00:00",
+          "model": "gemini-2.5-pro",
+          "success": true,
+          "input_characters": 51228,
+          "output_characters": 1752,
+          "input_tokens": 14094,
+          "output_tokens": 423,
+          "total_tokens": 18171,
+          "estimated_cost_usd": 0.0052857,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T12:27:33.528437+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 51498,
+          "output_characters": 175,
+          "input_tokens": 14144,
+          "output_tokens": 66,
+          "total_tokens": 14250,
+          "estimated_cost_usd": 0.0044082,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T12:28:01.220140+00:00",
+          "model": "gemini-2.5-pro",
+          "success": true,
+          "input_characters": 52839,
+          "output_characters": 1471,
+          "input_tokens": 14462,
+          "output_tokens": 362,
+          "total_tokens": 17769,
+          "estimated_cost_usd": 0.0052436,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T12:30:23.148384+00:00",
+          "model": "gemini-2.5-flash",
+          "success": true,
+          "input_characters": 51213,
+          "output_characters": 174,
+          "input_tokens": 14083,
+          "output_tokens": 62,
+          "total_tokens": 14196,
+          "estimated_cost_usd": 0.0043799,
+          "error": ""
+        },
+        {
+          "timestamp": "2026-05-18T12:30:43.618705+00:00",
+          "model": "gemini-2.5-pro",
+          "success": true,
+          "input_characters": 52558,
+          "output_characters": 1963,
+          "input_tokens": 14396,
+          "output_tokens": 480,
+          "total_tokens": 16786,
+          "estimated_cost_usd": 0.0055188,
+          "error": ""
+        }
+      ],
+      "totals": {
+        "calls": 22,
+        "input_tokens": 105348,
+        "output_tokens": 28793,
+        "total_tokens": 171674,
+        "estimated_cost_usd": 0.1035869
+      }
+    }
+  ],
+  "currency": "USD",
+  "pricing_note": "Estimated from token counts and GEMINI_*_COST_PER_1M settings.",
+  "all_runs_total": {
+    "calls": 22,
+    "input_tokens": 105348,
+    "output_tokens": 28793,
+    "total_tokens": 171674,
+    "estimated_cost_usd": 0.1035869
+  }
+}

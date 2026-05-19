@@ -5,6 +5,8 @@
 import os
 from pathlib import Path
 
+ENGINE_DIR = Path(__file__).resolve().parent
+
 
 def _load_dotenv() -> None:
     """Load simple KEY=VALUE pairs from planning_engine/.env if present."""
@@ -25,6 +27,14 @@ def _load_dotenv() -> None:
 
 
 _load_dotenv()
+
+
+def _engine_relative_path(env_name: str, default: str) -> str:
+    raw_path = os.getenv(env_name, default)
+    path = Path(raw_path)
+    if path.is_absolute():
+        return str(path)
+    return str(ENGINE_DIR / path)
 
 # ── Gemini ───────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
@@ -55,7 +65,7 @@ MIN_INTENT_CONFIDENCE = 0.65
 MAX_VALIDATION_REPAIR_ATTEMPTS = int(os.getenv("MAX_VALIDATION_REPAIR_ATTEMPTS", "2"))
 
 # ── Cost tracking ──────────────────────────────────────────────
-COST_LOG_DIR = os.getenv("COST_LOG_DIR", "cast_calculation")
+COST_LOG_DIR = _engine_relative_path("COST_LOG_DIR", "cast_calculation")
 COST_LOG_FILENAME = os.getenv("COST_LOG_FILENAME", "llm_usage.json")
 GEMINI_INPUT_COST_PER_1M = float(os.getenv("GEMINI_INPUT_COST_PER_1M", "0.30"))
 GEMINI_OUTPUT_COST_PER_1M = float(os.getenv("GEMINI_OUTPUT_COST_PER_1M", "2.50"))
@@ -73,7 +83,7 @@ FLUTTER_LOCAL_DB_OPTIONS    = ["isar", "hive", "sqflite", "drift"]
 FLUTTER_NAV_OPTIONS         = ["go_router", "auto_route", "navigator_2"]
 
 # ── Output ────────────────────────────────────────────────────
-OUTPUT_DIR          = "outputs"
+OUTPUT_DIR          = _engine_relative_path("OUTPUT_DIR", "outputs")
 FINAL_PLAN_FILENAME = "master_plan.json"
 SUMMARY_FILENAME_SUFFIX = "_summary.json"
 

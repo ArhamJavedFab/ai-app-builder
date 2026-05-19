@@ -194,25 +194,35 @@ def _dedup_errors(errors: list[dict]) -> list[dict]:
 
 # ── Public interface ──────────────────────────────────────────
 
-def validate_plan(plan: dict) -> dict:
+def validate_plan(plan: dict, use_llm: bool = True) -> dict:
     """
     Runs rule-based checks + LLM validation.
     Returns a merged, de-duplicated validation result dict.
     """
     if config.VERBOSE:
-        print("  ✅  Validating plan (Pro model)...")
+        mode = "Pro model" if use_llm else "rule-based only"
+        print(f"  ✅  Validating plan ({mode})...")
 
     # Layer 1: deterministic rules (no LLM)
     rule_issues = _rule_based_checks(plan)
 
     # Layer 2: LLM semantic validation
-    try:
-        filled     = VALIDATION_AGENT.format(plan_json=json.dumps(plan, indent=2))
-        llm_result = call_gemini_json(filled, use_pro=True)
-    except Exception as e:
-        print(f"      ⚠️  LLM validation failed ({e}), using rule-based only.")
-        llm_result = {"errors": [], "confidence_score": 0.7,
-                      "missing_info": [], "assumptions_made": [], "ai_notes": []}
+    if use_llm:
+        try:
+            filled     = VALIDATION_AGENT.format(plan_json=json.dumps(plan, indent=2))
+            llm_result = call_gemini_json(filled, use_pro=True)
+        except Exception as e:
+            print(f"      ⚠️  LLM validation failed ({e}), using rule-based only.")
+            llm_result = {"errors": [], "confidence_score": 0.7,
+                          "missing_info": [], "assumptions_made": [], "ai_notes": []}
+    else:
+        llm_result = {
+            "errors": [],
+            "confidence_score": plan.get("confidence_score", 1.0),
+            "missing_info": plan.get("missing_info", []),
+            "assumptions_made": plan.get("assumptions_made", []),
+            "ai_notes": plan.get("ai_notes", []),
+        }
 
     # Merge and de-duplicate
     all_errors = _dedup_errors(rule_issues + llm_result.get("errors", []))
