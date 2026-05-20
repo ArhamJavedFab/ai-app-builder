@@ -39,3 +39,12 @@ Thumbs.db
 
 # Local archives
 *.zip
+
+
+planning_engine/view/
+planning_engine/*view/
+planning_engine/cast_calculation/llm_usage.json
+planning_engine/cast_calculation
+planning_engine/cast_calculation/usage_tracker.py
+
+create_structure.ps1
