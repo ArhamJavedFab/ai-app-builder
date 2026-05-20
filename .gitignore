@@ -46,5 +46,6 @@ planning_engine/*view/
 planning_engine/cast_calculation/llm_usage.json
 planning_engine/cast_calculation
 planning_engine/cast_calculation/usage_tracker.py
+planning_engine/cast_calculation/llm_usage_v1.json
 
 create_structure.ps1

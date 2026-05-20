@@ -14,243 +14,408 @@ from core.prompt_templates import (
     CLARIFICATION_GENERATOR,
     REQUIREMENT_COMPLETENESS_AUDITOR,
     STARTUP_QUESTION_GENERATOR,
+    CONVERSATIONAL_VALIDATOR,
 )
 import config
 
 
-def _question_with_examples(q: dict) -> str:
-    question = q.get("question", "")
-    examples = q.get("examples") or q.get("options") or []
-    if examples:
-        short_examples = [str(example)[:50] for example in examples[:2]]
-        question = f"{question} (e.g. {', '.join(short_examples)})"
-    return question
+# ─────────────────────────────────────────────────────────────
+# DISPLAY HELPERS
+# ─────────────────────────────────────────────────────────────
+
+def _print_divider() -> None:
+    print("\n  " + "─" * 54)
 
 
-def _display_question(idx: int, q: dict) -> None:
-    print(f"\n  ?  Q{idx}: {_question_with_examples(q)}")
-    if q.get("default_answer"):
-        print(f"      Press Enter to use {q['default_answer']}, or type your own.")
+def _print_auto_answered(auto: dict) -> None:
+    """
+    Print what the AI already figured out from the prompt.
+    This replaces the generic 'app name / target users' questions entirely.
+    """
+    _print_divider()
+    print("  ✦  Here's what I already know from your idea:\n")
+    if auto.get("app_name"):
+        print(f"     App name  →  {auto['app_name']}")
+    if auto.get("domain"):
+        print(f"     Domain    →  {auto['domain'].replace('_', ' ').title()}")
+    if auto.get("platform"):
+        print(f"     Platform  →  {auto['platform']}")
+    if auto.get("inferred_notes"):
+        print(f"\n     {auto['inferred_notes']}")
+    _print_divider()
 
 
-def _ask_user(question: dict, idx: int) -> str:
-    _display_question(idx, question)
+def _display_smart_question(idx: int, total: int, q: dict) -> None:
+    """Render a smart question with numbered options.
+    The tip line "(Press Enter to let AI decide)" is removed for a cleaner UI.
+    """
+    print(f"\n  Q{idx}/{total}  {q['question']}\n")
+    options = q.get('options', [])
+    for i, opt in enumerate(options, 1):
+        marker = '◆' if i == 4 else '○'
+        print(f"     {marker} {i}.  {opt}")
+
+
+def validate_user_response(question: str, options: list, user_input: str) -> dict:
+    """
+    Call Gemini to validate the user response to a question.
+    """
+    if options:
+        options_text = "\n".join(f"- {opt}" for opt in options)
+    else:
+        options_text = "No fixed options."
+
+    filled = CONVERSATIONAL_VALIDATOR.format(
+        question=question,
+        options_text=options_text,
+        user_input=user_input,
+    )
+    try:
+        res = call_gemini_json(filled, use_pro=False)
+        if isinstance(res, dict):
+            return res
+    except Exception as e:
+        print(f"      ⚠️  Validation agent error: {e}")
+    
+    return {"is_valid": True, "chatbot_response": None}
+
+
+def _ask_smart_question(q: dict, idx: int, total: int) -> str:
+    """
+    Show a numbered-option question. Returns the chosen option text,
+    or the last option ('Let AI decide') on blank input.
+    Validates that the input is 1–4 or blank.
+    """
+    _display_smart_question(idx, total, q)
+    options = q.get("options", [])
+    ai_option = options[-1] if options else "Let AI decide based on my idea"
+
     while True:
-        raw = input("\n  >  Your answer: ").strip()
-        if not raw and question.get("default_answer"):
-            return question["default_answer"]
+        try:
+            raw = input("  >  Pick 1–4 or press Enter: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ai_option
+
+        # Blank = let AI decide
         if not raw:
+            print(f"     ✓  AI will decide")
+            return ai_option
+
+        # Numeric pick
+        if raw.isdigit():
+            choice = int(raw)
+            if 1 <= choice <= len(options):
+                chosen = options[choice - 1]
+                print(f"     ✓  {chosen}")
+                return chosen
+            else:
+                print(f"     Please enter a number between 1 and {len(options)}, or press Enter.")
+                continue
+
+        # Free text — validate it
+        validation = validate_user_response(
+            q.get("question", ""),
+            options,
+            raw
+        )
+        if validation.get("is_valid", True):
+            print(f"     ✓  Got it")
+            return raw
+        else:
+            chatbot_response = validation.get("chatbot_response") or "It seems the answer is not valid; please answer the correct one."
+            print(f"\n  🤖  {chatbot_response}")
             continue
-        return raw
 
 
-QUESTION_TEXT_BY_ID = {
-    "app_name": "What is the app name?",
-    "target_users": "Who will use this app?",
-    "mvp_scope": "What features come first?",
-    "management_scope": "Is this personal or shared?",
-}
+# ─────────────────────────────────────────────────────────────
+# SMART STARTUP QUESTIONS  (replaces generic name/users/scope)
+# ─────────────────────────────────────────────────────────────
+
+def _fallback_smart_questions(intent: dict) -> dict:
+    """
+    If Gemini fails, return domain-specific fallback questions.
+    Never asks 'what is the app name?' or 'who will use this?'
+    """
+    domain = (intent.get("domain") or "").lower()
+
+    if domain == "ecommerce":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "Your Store",
+                "domain":   "ecommerce",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "An e-commerce store app for buying and selling products.",
+            },
+            "questions": [
+                {
+                    "id": "product_type",
+                    "question": "What are you selling?",
+                    "options": [
+                        "Physical products (clothes, accessories, handmade items)",
+                        "Digital products (files, templates, courses)",
+                        "Both physical and digital products",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "payment_method",
+                    "question": "How do customers pay?",
+                    "options": [
+                        "Cash on delivery only",
+                        "Online payment (card, wallet)",
+                        "Both cash on delivery and online payment",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "admin_panel",
+                    "question": "Do you need an owner/admin panel?",
+                    "options": [
+                        "Yes — manage products, orders, and customers inside the app",
+                        "No — just the customer-facing store for now",
+                        "Basic order notifications only",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "food_delivery":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "FoodApp",
+                "domain": "food delivery",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A food ordering and delivery app.",
+            },
+            "questions": [
+                {
+                    "id": "restaurant_model",
+                    "question": "One restaurant or multiple?",
+                    "options": [
+                        "Single restaurant (my own place)",
+                        "Multiple restaurants on one platform",
+                        "Cloud kitchen / delivery-only",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "driver_app",
+                    "question": "Do drivers need a separate app?",
+                    "options": [
+                        "Yes — drivers get their own app",
+                        "No — owner handles delivery manually",
+                        "Third-party delivery (no driver app needed)",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain in ("health", "fitness"):
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "FitApp",
+                "domain": "health & fitness",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A health or fitness tracking app.",
+            },
+            "questions": [
+                {
+                    "id": "user_model",
+                    "question": "Solo tracking or trainer–client?",
+                    "options": [
+                        "Solo — one person tracking their own progress",
+                        "Trainer managing multiple clients",
+                        "Community / group challenges",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "content_type",
+                    "question": "What does the user track or consume?",
+                    "options": [
+                        "Workouts and exercises",
+                        "Diet and nutrition",
+                        "Both workouts and nutrition",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    # Generic fallback for any other domain
+    detected = ", ".join(intent.get("detected_modules") or ["core features"])
+    return {
+        "auto_answered": {
+            "app_name": intent.get("app_name") or "Your App",
+            "domain": domain or "general",
+            "platform": "Flutter mobile app",
+            "inferred_notes": f"Detected modules: {detected}.",
+        },
+        "questions": [
+            {
+                "id": "core_scope",
+                "question": "What's the most important first feature?",
+                "options": [
+                    f"Start with {detected.split(',')[0].strip()} and keep it minimal",
+                    "Build the full feature set from day one",
+                    "MVP only — add features over time",
+                    "Let AI decide based on my idea",
+                ],
+            },
+            {
+                "id": "user_accounts",
+                "question": "Do users need accounts?",
+                "options": [
+                    "Yes — login, profile, and saved data",
+                    "No — open access, no accounts",
+                    "Optional guest mode + accounts",
+                    "Let AI decide based on my idea",
+                ],
+            },
+        ],
+    }
 
 
-def _normalize_question_text(question: dict) -> dict:
-    question_id = str(question.get("id", ""))
-    if question_id in QUESTION_TEXT_BY_ID:
-        question["question"] = QUESTION_TEXT_BY_ID[question_id]
-    return question
-
-
-def _required_startup_questions(prompt: str, intent: dict) -> list[dict]:
+def _generate_smart_questions(prompt: str, intent: dict) -> dict:
+    """
+    Call Gemini to generate smart, domain-specific questions with 4 options each.
+    Falls back to domain-specific hardcoded questions if Gemini fails.
+    Returns {"auto_answered": {...}, "questions": [...]}
+    """
     suggested_name = suggest_app_name(prompt, intent)
     filled = STARTUP_QUESTION_GENERATOR.format(
         prompt=prompt,
         intent_json=json.dumps(intent, indent=2),
         suggested_name=suggested_name,
     )
-
     try:
         result = call_gemini_json(filled, use_pro=False)
     except Exception:
-        return _fallback_required_startup_questions(prompt, intent, suggested_name)
+        return _fallback_smart_questions(intent)
 
-    questions = result.get("questions", []) if isinstance(result, dict) else []
-    if not isinstance(questions, list) or not questions:
-        return _fallback_required_startup_questions(prompt, intent, suggested_name)
+    if not isinstance(result, dict):
+        return _fallback_smart_questions(intent)
 
-    expected_ids = ["app_name", "target_users", "mvp_scope", "management_scope"]
-    by_id = {
-        str(question.get("id", "")): question
-        for question in questions
-        if isinstance(question, dict)
-    }
+    questions = result.get("questions", [])
+    auto      = result.get("auto_answered", {})
 
-    ordered_questions: list[dict] = []
-    fallback_questions = {
-        q["id"]: q
-        for q in _fallback_required_startup_questions(prompt, intent, suggested_name)
-    }
-    for question_id in expected_ids:
-        question = by_id.get(question_id) or fallback_questions[question_id]
-        if question_id == "app_name":
-            question["default_answer"] = question.get("default_answer") or suggested_name
-            question["examples"] = question.get("examples") or [suggested_name]
-        ordered_questions.append(_normalize_question_text(question))
-    return ordered_questions
+    # Validate: each question must have exactly 4 options
+    valid_questions = []
+    for q in questions:
+        opts = q.get("options", [])
+        if not opts:
+            continue
+        # Ensure option 4 is always the AI-decide option
+        while len(opts) < 4:
+            opts.append("Let AI decide based on my idea")
+        opts = opts[:4]
+        opts[3] = "Let AI decide based on my idea"
+        q["options"] = opts
+        valid_questions.append(q)
 
+    if not valid_questions:
+        return _fallback_smart_questions(intent)
 
-def _fallback_required_startup_questions(
-    prompt: str,
-    intent: dict,
-    suggested_name: str,
-) -> list[dict]:
-    app_type = intent.get("app_type") or "this app"
-    users = intent.get("target_users") or ["people who need this app"]
-    modules = intent.get("detected_modules") or ["core tracking", "profile", "settings"]
+    # Ensure auto_answered has app_name at minimum
+    if not auto.get("app_name"):
+        auto["app_name"] = suggested_name
 
-    user_examples = [str(user) for user in users[:3]]
-    if len(user_examples) < 3:
-        user_examples.append(f"people using {app_type}")
-    if len(user_examples) < 3:
-        user_examples.append("use sensible defaults")
-
-    module_text = ", ".join(str(module).lower() for module in modules[:3])
-    return [
-        {
-            "id": "app_name",
-            "question": "What is the app name?",
-            "examples": [suggested_name],
-            "default_answer": suggested_name,
-        },
-        {
-            "id": "target_users",
-            "question": "Who will use this app?",
-            "examples": user_examples[:3],
-        },
-        {
-            "id": "mvp_scope",
-            "question": "What features come first?",
-            "examples": [
-                module_text,
-                "use the core features from my prompt",
-                "use sensible defaults",
-            ],
-        },
-        {
-            "id": "management_scope",
-            "question": "Is this personal or shared?",
-            "examples": [
-                "personal-only for now",
-                "include coach or reviewer access",
-                "use sensible defaults",
-            ],
-        },
-    ]
+    return {"auto_answered": auto, "questions": valid_questions}
 
 
 def ask_required_startup_questions(prompt: str, intent: dict) -> dict:
+    """
+    Public entry point for Stage 2 startup questions.
+
+    Flow:
+      1. Call Gemini to generate 2–4 smart domain-specific questions
+      2. Print what the AI already inferred (auto_answered)
+      3. Ask ONLY the remaining intelligent questions with 4 options
+      4. Blank input → option 4 'Let AI decide'
+      5. Return clarifications dict for downstream agents
+
+    This replaces the old generic: app_name / target_users / mvp_scope / management_scope
+    """
     if not config.ASK_REQUIRED_STARTUP_QUESTIONS:
         return {}
 
-    print("\n  Before planning, I need a few required basics.\n")
-    answers = {}
-    for i, question in enumerate(_required_startup_questions(prompt, intent), 1):
-        answer = _ask_user(question, i)
-        answers[question["id"]] = {
-            "question": question["question"],
-            "answer": answer,
+    data      = _generate_smart_questions(prompt, intent)
+    auto      = data.get("auto_answered", {})
+    questions = data.get("questions", [])
+
+    # Show what was auto-inferred — no need to ask these
+    _print_auto_answered(auto)
+
+    if not questions:
+        print("  ✅  All details inferred from your prompt. Proceeding to planning.\n")
+        return {"_auto": {"question": "auto-inferred", "answer": json.dumps(auto)}}
+
+    print(f"\n  Just {len(questions)} quick question(s) and we're ready to build your plan.\n")
+
+    answers: dict = {}
+    total = len(questions)
+
+    for i, q in enumerate(questions, 1):
+        qid    = q.get("id") or f"q{i}"
+        answer = _ask_smart_question(q, i, total)
+        answers[qid] = {
+            "question": q.get("question", ""),
+            "answer":   answer,
         }
+
+    # Store auto-answered fields too so downstream agents use them
+    answers["_auto"] = {
+        "question": "auto-inferred",
+        "answer":   json.dumps(auto),
+    }
+
+    print(f"\n  ✅  Got it — generating your plan now.\n")
     return answers
 
 
-# FASTAPI WEB CHAT HELPERS:
-# These helpers expose the same startup questions without calling input().
-# The CLI path above is unchanged and still asks questions in the terminal.
+# ─────────────────────────────────────────────────────────────
+# WEB API HELPERS  (FastAPI / view layer — unchanged interface)
+# ─────────────────────────────────────────────────────────────
+
 def build_required_startup_questions(prompt: str, intent: dict) -> list[dict]:
     if not config.ASK_REQUIRED_STARTUP_QUESTIONS:
         return []
-    return _required_startup_questions(prompt, intent)
+    data = _generate_smart_questions(prompt, intent)
+    return data.get("questions", [])
 
 
-# FASTAPI WEB CHAT HELPERS:
-# Convert frontend answers into the same clarifications shape used by the CLI.
 def build_startup_answers(questions: list[dict], raw_answers: dict[str, str]) -> dict:
     answers = {}
-    for question in questions:
-        question_id = question.get("id", "")
-        answer = str(raw_answers.get(question_id, "")).strip()
-        if not answer and question.get("default_answer"):
-            answer = str(question["default_answer"])
+    for q in questions:
+        qid    = q.get("id", "")
+        answer = str(raw_answers.get(qid, "")).strip()
+        opts   = q.get("options", [])
+        # Resolve numeric pick from web UI
+        if answer.isdigit() and 1 <= int(answer) <= len(opts):
+            answer = opts[int(answer) - 1]
         if not answer:
-            continue
-        answers[question_id] = {
-            "question": question.get("question", ""),
-            "answer": answer,
-        }
+            answer = opts[-1] if opts else "Let AI decide based on my idea"
+        answers[qid] = {"question": q.get("question", ""), "answer": answer}
     return answers
 
+
+# ─────────────────────────────────────────────────────────────
+# REQUIREMENT COMPLETENESS  (rounds 2+ — unchanged logic)
+# ─────────────────────────────────────────────────────────────
 
 def _fallback_questions(intent: dict) -> list[dict]:
     domain = (intent.get("domain") or "").lower()
     if domain != "ecommerce":
-        return [
-            {
-                "id": "core_scope",
-                "question": "Must-have first-version actions?",
-                "examples": [
-                    "use sensible defaults",
-                    "home, account/profile, and settings",
-                ],
-            }
-        ]
-
+        return [{"id": "core_scope", "question": "Must-have first-version feature?",
+                 "examples": ["use sensible defaults", "home, profile, and settings"]}]
     return [
-        {
-            "id": "products",
-            "question": (
-                "Product type?"
-            ),
-            "examples": [
-                "clothing with size/color variants",
-                "simple products without variants",
-            ],
-        },
-        {
-            "id": "checkout",
-            "question": "Checkout method?",
-            "examples": [
-                "online payment plus cash on delivery",
-                "cash on delivery only",
-                "customers contact me to order",
-            ],
-        },
-        {
-            "id": "auth_profile",
-            "question": (
-                "Customer accounts?"
-            ),
-            "examples": [
-                "full customer account",
-                "guest checkout with optional account",
-                "no accounts in first version",
-            ],
-        },
-        {
-            "id": "store_admin",
-            "question": "Owner area?",
-            "examples": [
-                "include product and order management",
-                "customer app only",
-                "later, post-MVP",
-            ],
-        },
-        {
-            "id": "visual_direction",
-            "question": "Visual style?",
-            "examples": [
-                "modern and high contrast",
-                "soft and minimal",
-                "premium brand style",
-            ],
-        },
+        {"id": "products",         "question": "Product type?",      "examples": ["clothing with variants", "simple products"]},
+        {"id": "checkout",         "question": "Checkout method?",   "examples": ["cash on delivery", "online payment"]},
+        {"id": "auth_profile",     "question": "Customer accounts?", "examples": ["full account", "guest checkout"]},
+        {"id": "store_admin",      "question": "Owner panel?",       "examples": ["yes, manage products", "customer app only"]},
+        {"id": "visual_direction", "question": "Visual style?",      "examples": ["modern minimal", "soft pastel"]},
     ]
 
 
@@ -276,6 +441,38 @@ def _legacy_question_generation(prompt: str, intent: dict) -> list[dict]:
     return result.get("questions", [])
 
 
+def _display_followup_question(idx: int, q: dict) -> None:
+    """For round 2+ questions — simpler display, no numbered options."""
+    question = q.get("question", "")
+    examples = q.get("examples") or []
+    if examples:
+        question = f"{question} (e.g. {', '.join(str(e)[:50] for e in examples[:2])})"
+    print(f"\n  ?  Q{idx}: {question}")
+
+
+def _ask_followup(question: dict, idx: int) -> str:
+    _display_followup_question(idx, question)
+    while True:
+        try:
+            raw = input("\n  >  Your answer: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return "use sensible defaults"
+        if not raw:
+            continue
+
+        validation = validate_user_response(
+            question.get("question", ""),
+            question.get("examples", []),
+            raw
+        )
+        if validation.get("is_valid", True):
+            return raw
+        else:
+            chatbot_response = validation.get("chatbot_response") or "It seems the answer is not valid; please answer the correct one."
+            print(f"\n  🤖  {chatbot_response}")
+            continue
+
+
 def extract_requirements(
     prompt: str,
     intent: dict,
@@ -283,8 +480,9 @@ def extract_requirements(
     initial_clarifications: dict | None = None,
 ) -> dict:
     """
-    Stage 2 - ask clarifying questions until the plan has enough real context.
-    Returns a dict of {question_id: {question, answer}}.
+    Stage 2 continued — completeness audit + follow-up questions.
+    Called AFTER ask_required_startup_questions().
+    Uses plain open-ended questions (not numbered options) for follow-ups.
     """
     if config.VERBOSE:
         print("  Checking requirement clarity...")
@@ -292,44 +490,28 @@ def extract_requirements(
     clarifications: dict = dict(initial_clarifications or {})
 
     for round_no in range(1, config.MAX_CLARIFICATION_ROUNDS + 1):
-        audit = _audit_completeness(prompt, intent, clarifications)
-        score = float(audit.get("completeness_score", 0.0) or 0.0)
-        clear_enough = (
-            bool(audit.get("is_clear_enough", False))
-            and score >= config.MIN_REQUIREMENT_COMPLETENESS
-        )
+        audit       = _audit_completeness(prompt, intent, clarifications)
+        score       = float(audit.get("completeness_score", 0.0) or 0.0)
+        clear_enough = bool(audit.get("is_clear_enough", False)) and score >= config.MIN_REQUIREMENT_COMPLETENESS
 
         if clear_enough and not force:
             if config.VERBOSE:
                 print(f"      Requirements clear enough ({score:.0%}).")
             return clarifications
 
-        questions = audit.get("questions", [])
-        if not questions:
-            questions = _legacy_question_generation(prompt, intent)
-        if not questions:
-            questions = _fallback_questions(intent)
+        questions  = audit.get("questions", []) or _legacy_question_generation(prompt, intent) or _fallback_questions(intent)
+        unanswered = [q for q in questions[:config.MAX_CLARIFICATION_QUESTIONS]
+                      if q.get("id", "") not in clarifications]
 
-        unanswered = [
-            q
-            for q in questions[: config.MAX_CLARIFICATION_QUESTIONS]
-            if q.get("id", "") not in clarifications
-        ]
         if not unanswered:
             return clarifications
 
-        print(
-            f"\n  I need {len(unanswered)} answer(s) before generating the plan "
-            f"(clarity: {score:.0%}, round {round_no}).\n"
-        )
+        print(f"\n  I need {len(unanswered)} more answer(s) (clarity: {score:.0%}, round {round_no}).\n")
 
         for i, q in enumerate(unanswered, 1):
-            qid = q.get("id") or f"round_{round_no}_q{i}"
-            answer = _ask_user(q, i)
-            clarifications[qid] = {
-                "question": q.get("question", ""),
-                "answer": answer,
-            }
+            qid    = q.get("id") or f"round_{round_no}_q{i}"
+            answer = _ask_followup(q, i)
+            clarifications[qid] = {"question": q.get("question", ""), "answer": answer}
 
         force = False
 

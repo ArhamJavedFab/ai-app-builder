@@ -201,6 +201,12 @@ def request_plan_patches(plan: dict[str, Any], instruction: str) -> dict[str, An
     result = call_gemini_json(prompt, use_pro=False)
     if not isinstance(result, dict) or "patches" not in result:
         raise RuntimeError("Patch editor did not return a patches object.")
+    # Normalize any patch paths that mistakenly reference a "sections" wrapper.
+    for patch in result.get("patches", []):
+        path = patch.get("path", "")
+        if path.startswith("/sections"):
+            # Remove the leading "/sections" segment to match the actual plan structure.
+            patch["path"] = path.replace("/sections", "", 1)
     return result
 
 

@@ -28,18 +28,14 @@ BANNER = """
 
 
 def get_prompt_from_user() -> str:
+    """Prompt the user for a one‑line description of the Flutter app.
+    Returns the entered string stripped of surrounding whitespace.
+    """
     print("\n  Describe the Flutter app you want to build.")
-    print("  Tip: Include target users, key features, and any special requirements.\n")
-    lines = []
-    print("  >  (Press Enter twice when done)\n     ", end="")
-    while True:
-        line = input()
-        if line == "" and lines and lines[-1] == "":
-            break
-        lines.append(line)
-        if line != "":
-            print("     ", end="")
-    return " ".join(l for l in lines if l).strip()
+    # Single line input; no tip, no double‑enter requirement.
+    line = input("  > ").strip()
+    return line
+    # Legacy multi-line input handling removed
 
 
 def _summary_path_for(output_path: str) -> str:
@@ -121,10 +117,27 @@ def main() -> None:
             run_chat_editor(args.edit_plan, _summary_path_for(args.edit_plan))
             return
 
-        prompt = args.prompt or get_prompt_from_user()
-        if not prompt.strip():
-            print("\n  No prompt provided. Exiting.")
-            sys.exit(1)
+        while True:
+            prompt = args.prompt or get_prompt_from_user()
+            if not prompt.strip():
+                print("\n  No prompt provided. Exiting.")
+                sys.exit(1)
+
+            # Validate prompt if it is a greeting or invalid
+            from agents.requirement_extractor import validate_user_response
+            validation = validate_user_response(
+                "Describe the Flutter app you want to build.",
+                [],
+                prompt
+            )
+            if validation.get("is_valid", True):
+                break
+            else:
+                chatbot_response = validation.get("chatbot_response") or "It seems the answer is not valid; please answer the correct one."
+                print(f"\n  🤖  {chatbot_response}\n")
+                if args.prompt:
+                    # If prompt was passed via CLI arg, don't loop infinitely, just exit
+                    sys.exit(1)
 
         print(f"\n  Prompt received ({len(prompt)} chars)")
         print(f"  {'-' * 56}")
@@ -157,12 +170,9 @@ def main() -> None:
         print(f"\n  Full JSON saved to: {output_path}")
         print(f"  Short summary saved to: {summary_path}")
 
-        should_chat = args.chat
-        if not should_chat and not args.prompt and sys.stdin.isatty():
-            should_chat = _ask_yes_no("  Open chat edit mode now")
-
-        if should_chat:
-            run_chat_editor(output_path, summary_path)
+        # Automatically open chat edit mode after generating the plan
+        should_chat = True
+        run_chat_editor(output_path, summary_path)
     finally:
         _print_cost_summary(run_id)
 

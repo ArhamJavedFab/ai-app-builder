@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # core/prompt_templates.py â€” Agent prompt templates
 # ============================================================
 
@@ -67,52 +67,55 @@ If the prompt is detailed enough, set needs_clarification to false and return em
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # ///////////////////////////////////////////    STARTUP_QUESTION_GENERATOR    ///////////////////////////////////////////
 STARTUP_QUESTION_GENERATOR = """
-You are generating the first required clarification questions for a Flutter app planning CLI.
+You are a senior product strategist generating smart clarification questions for an app idea.
 
 User prompt:
 \"\"\"{prompt}\"\"\"
 
-Current intent:
+Current intent analysis:
 {intent_json}
 
-Suggested app name:
+Suggested app name (AI-inferred):
 {suggested_name}
+
+Your job:
+1. Auto-answer everything you can confidently infer from the prompt and intent.
+2. Only ask questions where the answer GENUINELY changes the architecture or screens.
+3. Questions must be specific to the user's domain — not generic.
+4. Each question must have exactly 4 options the user can pick by typing 1/2/3/4.
+   Option 4 must always be: "Let AI decide based on my idea"
+5. Generate between 2 and 5 questions maximum. Never ask about app name — infer it.
+6. Questions should be simple complete sentences.
 
 Return ONLY valid JSON:
 {{
+  "auto_answered": {{
+    "app_name": "{suggested_name}",
+    "domain": "<domain from intent>",
+    "platform": "Flutter mobile app",
+    "inferred_notes": "<one sentence: what you confidently inferred from the prompt>"
+  }},
   "questions": [
     {{
-      "id": "app_name",
-      "question": "What is the app name?",
-      "examples": ["{suggested_name}"],
-      "default_answer": "{suggested_name}"
-    }},
-    {{
-      "id": "target_users",
-      "question": "Who will use this app?",
-      "examples": ["<domain-specific user group>", "<another domain-specific user group>"]
-    }},
-    {{
-      "id": "mvp_scope",
-      "question": "What features come first?",
-      "examples": ["<domain-specific MVP scope>", "use sensible defaults"]
-    }},
-    {{
-      "id": "management_scope",
-      "question": "Is this personal or shared?",
-      "examples": ["<domain-specific answer>", "use sensible defaults"]
+      "id": "<short_snake_case_id>",
+      "question": "<specific, intelligent question — NOT generic>",
+      "options": [
+        "<specific option 1>",
+        "<specific option 2>",
+        "<specific option 3>",
+        "Let AI decide based on my idea"
+      ]
     }}
   ]
 }}
 
 Rules:
-- The examples MUST match the user's app idea and domain.
-- Do not use generic school, employee, manager, ecommerce, or attendance examples unless the user prompt is actually about that domain.
-- Use full-sentence questions, 5 to 6 words.
-- Each question asks exactly one thing.
-- Do not include a why field.
-- Keep exactly these 4 ids: app_name, target_users, mvp_scope, management_scope.
-- The first question must include default_answer.
+- questions array: 2 to 5 items maximum.
+- Each question has exactly 4 options. Option 4 is always "Let AI decide based on my idea".
+- Options must be concrete and specific to the user's domain — not generic.
+- Never include a "default_answer" field. Blank input = option 4 automatically.
+- Never ask about app name, platform, or technology — infer these.
+- The question text must be under 12 words.
 """
 
 REQUIREMENT_COMPLETENESS_AUDITOR = """
@@ -665,3 +668,40 @@ Rules:
 - Do not return a full plan.
 - The context may include only relevant sections, but paths must target the full master plan.
 """
+
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# ///////////////////////////////////////////    CONVERSATIONAL VALIDATOR    ///////////////////////////////////////////
+
+CONVERSATIONAL_VALIDATOR = """
+You are an intelligent, natural conversational chatbot and validator for a Flutter app planning system.
+
+The user is being asked a question during the requirement gathering phase or initial prompt entry.
+Question: "{question}"
+Options (if any):
+{options_text}
+
+User's response:
+"{user_input}"
+
+Your task is to analyze the user's response and decide:
+1. Is it a valid, relevant answer or a descriptive response to the question? (true/false)
+   - If they chose a valid option, or wrote a custom answer/description that addresses the question topic, or described an app idea when asked to describe their app, it is valid (set "is_valid": true).
+   - If it is a greeting (e.g., "Hi", "Hello"), casual talk (e.g., "how are you?", "who are you?"), a question about the system (e.g., "what can you do?", "how does this work?"), or completely off-topic/gibberish, it is NOT a valid answer to the current question (set "is_valid": false).
+
+2. What is the chatbot's conversational response to the user?
+   - If valid (is_valid is true): Keep this field null or empty (no response needed, as the system will proceed to process their input).
+   - If invalid/greeting/casual/off-topic (is_valid is false): Generate a TOTALLY CUSTOM, NATURAL, DYNAMIC, and HELPFUL response that directly addresses their specific input:
+     * NEVER use static or repetitive templates. Do NOT copy examples literally.
+     * If they asked a question (e.g., "who are you?", "what can you do?"), answer their question directly, warmly, and accurately as a helpful AI app planning assistant. Then politely transition to asking them to describe their Flutter app idea or answer the current question.
+     * If they greeted you (e.g., "Hi", "Hello"), greet them back in a friendly, conversational manner, introduce yourself as their Flutter App Planner, and invite them to share their app idea (or answer the current question).
+     * If they wrote something off-topic or unclear, acknowledge what they said or ask a clarifying question, and explain what kind of input you are looking for to help them build their app plan.
+     * Ensure the response is warm, professional, engaging, and sounds like a real humans-in-the-loop product strategist, not a robotic script.
+
+Return ONLY valid JSON:
+{{
+  "is_valid": true|false,
+  "chatbot_response": "<a custom, natural, and conversational response tailored to what the user said, or null>"
+}}
+"""
+
