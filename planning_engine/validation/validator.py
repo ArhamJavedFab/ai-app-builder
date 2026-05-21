@@ -59,6 +59,24 @@ def _rule_based_checks(plan: dict) -> list[dict]:
             f"auth_provider is '{backend.get('auth_provider')}', but this planner must use Firebase Auth.",
             "Set backend.auth_provider to 'firebase_auth'.",
         ))
+    if backend.get("api_endpoints"):
+        issues.append(_issue(
+            "critical", "backend",
+            "backend.api_endpoints is not empty, but Firebase plans must use SDK calls instead of REST endpoints.",
+            "Set backend.api_endpoints to [].",
+        ))
+    if arch.get("network_layer") not in ("", "firebase_sdk"):
+        issues.append(_issue(
+            "critical", "architecture",
+            f"network_layer is '{arch.get('network_layer')}', but Firebase SDKs must be used.",
+            "Set flutter_architecture.network_layer to 'firebase_sdk'.",
+        ))
+    if arch.get("local_database") not in ("", "firestore_offline_cache"):
+        issues.append(_issue(
+            "critical", "architecture",
+            f"local_database is '{arch.get('local_database')}', but Firestore offline cache must be used.",
+            "Set flutter_architecture.local_database to 'firestore_offline_cache'.",
+        ))
 
     # ── 1. Duplicate screen names ─────────────────────────────
     seen = {}
@@ -130,7 +148,7 @@ def _rule_based_checks(plan: dict) -> list[dict]:
             issues.append(_issue(
                 "warning", "backend",
                 "ProfileScreen exists but no user/profile endpoint found in api_endpoints.",
-                "Add GET /api/v1/user/profile and PATCH /api/v1/user/profile to api_endpoints.",
+                "Use Firebase Auth plus a users Firestore collection for profile data.",
             ))
 
     # ── 7. Screen api_calls without matching endpoint ─────────
@@ -144,7 +162,7 @@ def _rule_based_checks(plan: dict) -> list[dict]:
                     "warning", "backend",
                     f"Screen '{screen.get('name','')}' has api_call '{call}' "
                     f"but '{path}' is not in backend.api_endpoints.",
-                    f"Add an endpoint for '{path}' in backend.api_endpoints.",
+                    f"Replace '{call}' with a Firebase SDK action and keep backend.api_endpoints empty.",
                 ))
 
     # ── 8. Cart strategy vs backend mismatch ─────────────────
@@ -162,7 +180,7 @@ def _rule_based_checks(plan: dict) -> list[dict]:
         issues.append(_issue(
             "warning", "architecture",
             "cart_strategy is 'server' and a cart table exists, but no cart endpoint is defined.",
-            "Add cart endpoints (GET/POST /api/v1/cart) to backend.api_endpoints.",
+            "Set cart_strategy to 'firestore' and use a cart/cart_items Firestore collection.",
         ))
 
     # ── 9. Design color contrast ──────────────────────────────

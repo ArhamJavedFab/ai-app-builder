@@ -6,8 +6,10 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import FEATURE_PLANNER
+from core.prompt_loader import load_prompt_template
 import config
+
+FEATURE_PLANNER = load_prompt_template("feature_planner.md")
 
 
 def plan_features(intent: dict, clarifications: dict) -> dict:

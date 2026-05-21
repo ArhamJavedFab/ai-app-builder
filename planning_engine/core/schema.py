@@ -31,9 +31,9 @@ class FlutterArchitecture:
     state_management: str       = "riverpod"          # riverpod | bloc | provider | getx
     architecture_pattern: str   = "feature_first_clean_architecture"
     navigation_package: str     = "go_router"
-    network_layer: str          = "dio"
-    local_database: str         = "isar"
-    offline_first: bool         = False
+    network_layer: str          = "firebase_sdk"
+    local_database: str         = "firestore_offline_cache"
+    offline_first: bool         = True
     modular: bool               = True
     flavors: list               = field(default_factory=list)   # dev / staging / prod
 

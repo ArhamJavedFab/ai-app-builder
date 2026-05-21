@@ -10,13 +10,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
 from core.app_name_suggester import suggest_app_name
+from core.prompt_loader import load_prompt_template
 from core.prompt_templates import (
-    CLARIFICATION_GENERATOR,
     REQUIREMENT_COMPLETENESS_AUDITOR,
-    STARTUP_QUESTION_GENERATOR,
     CONVERSATIONAL_VALIDATOR,
 )
 import config
+
+CLARIFICATION_GENERATOR = load_prompt_template("clarification_generator.md")
+STARTUP_QUESTION_GENERATOR = load_prompt_template("startup_question_generator.md")
 
 
 # ─────────────────────────────────────────────────────────────

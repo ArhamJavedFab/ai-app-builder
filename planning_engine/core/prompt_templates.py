@@ -1,13 +1,13 @@
-# ============================================================
-# core/prompt_templates.py â€” Agent prompt templates
+﻿# ============================================================
+# core/prompt_templates.py - Agent prompt templates
 # ============================================================
 
-# â”€â”€ INTENT ANALYZER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ##€ INTENT ANALYZER #########################################€
 
 INTENT_ANALYZER = """
 You are the Intent Analyzer for a Flutter app planning system.
 
-Analyze the following user prompt and return ONLY valid JSON â€” no markdown fences, no commentary.
+Analyze the following user prompt and return ONLY valid JSON - no markdown fences, no commentary.
 
 User prompt:
 \"\"\"{prompt}\"\"\"
@@ -211,7 +211,7 @@ Features:
 
 For every feature, generate the Flutter screens needed.
 Also include: onboarding flow, splash screen, error screens.
-Think like a Flutter developer â€” name screens with "Screen" suffix.
+Think like a Flutter developer - name screens with "Screen" suffix.
 Use Riverpod-style names in state_needed by default, e.g. AuthProvider,
 ProductProvider, CartProvider. Do not use Bloc names unless the app context
 explicitly asks for bloc.
@@ -219,7 +219,7 @@ Set api_calls to Firebase SDK actions such as "Firestore: read meals" or
 "Firebase Auth: sign in". Do not use REST paths like /api/v1.
 
 IMPORTANT RULES:
-- Every screen must have a unique name â€” never duplicate screen names.
+- Every screen must have a unique name - never duplicate screen names.
 - Every screen must have a non-empty route path (e.g. /home, /product/:id).
 - Include an ErrorScreen with route /error.
 - Include a SplashScreen with route /splash.
@@ -279,7 +279,7 @@ Return ONLY valid JSON:
     {{
       "label": "<Tab label>",
       "icon":  "<material icon name>",
-      "route": "<route path â€” must exist in routes array>"
+      "route": "<route path - must exist in routes array>"
     }}
   ],
   "routes": [
@@ -428,7 +428,7 @@ Complexity and features:
 {features_json}
 
 Design the complete Flutter architecture.
-Be specific â€” a junior Flutter developer should be able to follow this plan.
+Be specific - a junior Flutter developer should be able to follow this plan.
 
 CRITICAL RULES:
 - Use Firebase SDKs for backend access.
@@ -505,7 +505,7 @@ App context:
 App type: {app_type}
 Target users: {target_users}
 
-User's branding preferences (from clarifications â€” MUST be respected):
+User's branding preferences (from clarifications - MUST be respected):
 {branding_notes}
 
 Design a complete Flutter design system.
@@ -521,9 +521,9 @@ CRITICAL RULES:
 Return ONLY valid JSON:
 {{
   "theme":             "<modern_minimal|playful|professional|luxury|bold_editorial|soft_pastel|dark_techy>",
-  "primary_color":     "<hex â€” user's accent color if specified>",
+  "primary_color":     "<hex - user's accent color if specified>",
   "secondary_color":   "<hex>",
-  "background_color":  "<hex â€” user's background color if specified>",
+  "background_color":  "<hex - user's background color if specified>",
   "surface_color":     "<hex>",
   "error_color":       "<hex>",
   "success_color":     "<hex>",
@@ -552,7 +552,7 @@ Return ONLY valid JSON:
 # ///////////////////////////////////////////    VALIDATION PLANNER    ///////////////////////////////////////////
 
 VALIDATION_AGENT = """
-You are a Flutter App Plan Validator â€” the final quality gate.
+You are a Flutter App Plan Validator - the final quality gate.
 
 Review this complete app plan and identify real structural issues only.
 
@@ -567,15 +567,16 @@ Check ONLY for these concrete issues:
 5. needs_payment_gateway is false (COD) â†’ do NOT flag missing payments table, this is correct
 6. backend_type is not "firebase" or auth_provider is not "firebase_auth" â†’ critical
 7. If backend_type is "firebase", api_endpoints must be []; do not require endpoint matches for Firebase SDK api_calls
-8. primary_color and background_color are both close to the same hue (contrast issue) â†’ warning
-9. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" â†’ warning
-10. ErrorScreen is missing from screens â†’ suggestion
+8. network_layer is not "firebase_sdk" or local_database is not "firestore_offline_cache" â†’ critical
+9. primary_color and background_color are both close to the same hue (contrast issue) â†’ warning
+10. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" â†’ warning
+11. ErrorScreen is missing from screens â†’ suggestion
 
 Do NOT flag:
 - Missing post_mvp tables (these are intentionally excluded)
 - Wishlist/reviews tables missing (post_mvp)
 - Minor naming style differences
-- Registration fields vs database fields â€” these can differ by design
+- Registration fields vs database fields - these can differ by design
 - Firebase SDK api_calls without REST endpoints
 
 Return ONLY valid JSON:
@@ -586,13 +587,13 @@ Return ONLY valid JSON:
     {{
       "severity": "<critical|warning|suggestion>",
       "category": "<screens|navigation|database|backend|architecture|design>",
-      "issue":    "<specific, concrete issue â€” reference actual values from the plan>",
+      "issue":    "<specific, concrete issue - reference actual values from the plan>",
       "fix":      "<exact action to fix it>"
     }}
   ],
   "missing_info": ["<what the user never specified>"],
   "assumptions_made": ["<what the AI assumed>"],
-  "ai_notes": ["<general improvement tips â€” keep to 3 max>"]
+  "ai_notes": ["<general improvement tips - keep to 3 max>"]
 }}
 
 validation_passed must be true if there are zero critical errors.
@@ -616,12 +617,13 @@ Current plan:
 REPAIR RULES:
 1. For "auth_required: false but roles non-empty" â†’ patch that endpoint's roles to [].
 2. For non-Firebase backend/auth â†’ set backend_type to "firebase", auth_provider to "firebase_auth", and api_endpoints to [].
-3. For "cart_strategy mismatch" â†’ patch flutter_architecture.cart_strategy to match what backend has.
-4. For "design color inconsistency" â†’ patch design_system.primary_color to the user's specified color.
-5. For "missing ErrorScreen" â†’ append a minimal ErrorScreen to screens and /error to navigation.routes.
-6. For "bottom_tab route not in routes" â†’ append the missing route to navigation.routes.
-7. For "missing LoginScreen" â†’ append LoginScreen to screens and /login to navigation.routes.
-8. Never remove existing screens or tables â€” only add or patch.
+3. For non-Firebase architecture â†’ set flutter_architecture.network_layer to "firebase_sdk" and flutter_architecture.local_database to "firestore_offline_cache".
+4. For "cart_strategy mismatch" â†’ patch flutter_architecture.cart_strategy to match what backend has.
+5. For "design color inconsistency" â†’ patch design_system.primary_color to the user's specified color.
+6. For "missing ErrorScreen" â†’ append a minimal ErrorScreen to screens and /error to navigation.routes.
+7. For "bottom_tab route not in routes" â†’ append the missing route to navigation.routes.
+8. For "missing LoginScreen" â†’ append LoginScreen to screens and /login to navigation.routes.
+9. Never remove existing screens or tables - only add or patch.
 
 Return ONLY valid JSON with small patches:
 {{
@@ -637,7 +639,7 @@ Return ONLY valid JSON with small patches:
 
 Use "append" to add items to arrays.
 Use "set" to overwrite a specific field or index.
-Return the minimum patches needed â€” do not return the full plan.
+Return the minimum patches needed - do not return the full plan.
 """
 
 PLAN_PATCHER = """
@@ -704,4 +706,3 @@ Return ONLY valid JSON:
   "chatbot_response": "<a custom, natural, and conversational response tailored to what the user said, or null>"
 }}
 """
-

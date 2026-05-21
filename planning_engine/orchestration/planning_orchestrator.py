@@ -13,8 +13,8 @@ from core.prompt_templates import PLAN_REPAIRER
 from agents.intent_analyzer       import analyze_intent
 from agents.requirement_extractor import (
     ask_required_startup_questions,
-    extract_requirements,
 )
+from agents.assumption_generator import generate_assumptions
 from agents.feature_planner       import plan_features
 from agents.screen_planner        import plan_screens
 from agents.navigation_planner    import plan_navigation
@@ -109,6 +109,90 @@ def _apply_plan_patches(plan: MasterPlan, repair_result: dict) -> None:
     _apply_plan_dict(plan, updated)
 
 
+def _enforce_firebase_plan(plan: MasterPlan) -> None:
+    """
+    Final safety rail: this planner targets Firebase only.
+    Keep generated plans from falling back to REST clients or local DB engines.
+    """
+    backend = dict(plan.backend or {})
+    services = set(backend.get("firebase_services") or [])
+    services.update({"firebase_auth", "cloud_firestore"})
+
+    if backend.get("file_storage") == "firebase_storage":
+        services.add("firebase_storage")
+    elif backend.get("file_storage") not in {"firebase_storage", "none"}:
+        backend["file_storage"] = "none"
+
+    if backend.get("push_notifications"):
+        backend["push_provider"] = "fcm"
+        services.add("firebase_messaging")
+    else:
+        backend["push_provider"] = "none"
+
+    backend["needs_backend"] = True
+    backend["backend_type"] = "firebase"
+    backend["auth_provider"] = "firebase_auth"
+    backend["api_endpoints"] = []
+    backend["firebase_services"] = sorted(services)
+    backend.setdefault("firestore_collections", [])
+    backend["environment_variables"] = [
+        "FIREBASE_API_KEY",
+        "FIREBASE_PROJECT_ID",
+        "FIREBASE_APP_ID",
+    ]
+    plan.backend = backend
+
+    arch = dict(plan.flutter_architecture or {})
+    arch["network_layer"] = "firebase_sdk"
+    arch["local_database"] = "firestore_offline_cache"
+    if arch.get("cart_strategy") == "server":
+        arch["cart_strategy"] = "firestore"
+    arch["offline_first"] = True
+    plan.flutter_architecture = arch
+
+    blocked_packages = {
+        "dio",
+        "http",
+        "chopper",
+        "isar",
+        "isar_flutter_libs",
+        "sqflite",
+        "drift",
+        "hive",
+        "flutter_secure_storage",
+    }
+    dependencies = [
+        dep for dep in (plan.flutter_dependencies or [])
+        if str(dep.get("package", "")).lower() not in blocked_packages
+    ]
+    existing = {str(dep.get("package", "")).lower() for dep in dependencies}
+    for package, purpose in (
+        ("firebase_core", "Initialize Firebase in Flutter."),
+        ("firebase_auth", "Firebase Authentication."),
+        ("cloud_firestore", "Cloud Firestore data access."),
+        *(
+            (("firebase_storage", "Firebase Storage uploads."),)
+            if "firebase_storage" in services else ()
+        ),
+        *(
+            (("firebase_messaging", "FCM push notifications."),)
+            if "firebase_messaging" in services else ()
+        ),
+    ):
+        if package not in existing:
+            dependencies.append({"package": package, "version": "latest", "purpose": purpose})
+            existing.add(package)
+    plan.flutter_dependencies = dependencies
+    plan.dev_dependencies = [
+        dep for dep in (plan.dev_dependencies or [])
+        if str(dep.get("package", "")).lower() not in {
+            "isar_generator",
+            "drift_dev",
+            "hive_generator",
+        }
+    ]
+
+
 def _validate_and_repair(plan: MasterPlan) -> None:
     """
     Validate the plan. If it fails, attempt repairs up to
@@ -157,6 +241,7 @@ def _validate_and_repair(plan: MasterPlan) -> None:
             break
 
         _apply_plan_patches(plan, repair_result)
+        _enforce_firebase_plan(plan)
 
         if config.VERBOSE:
             summary = repair_result.get("summary", "Applied validation repair patches.")
@@ -232,26 +317,15 @@ def run_planning_pipeline(
         )
     else:
         clarifications = dict(startup_clarifications)
-    confidence = intent.get("confidence", 1.0)
-    force_clarification = (
-        confidence < config.MIN_INTENT_CONFIDENCE
-        or _prompt_needs_clarification(user_prompt, intent)
+
+    # Apply assumed basic functionality for missing context.
+    clarifications = _run_required_stage(
+        "Requirement Assumptions",
+        generate_assumptions,
+        user_prompt,
+        intent,
+        clarifications,
     )
-    # FASTAPI WEB CHAT SUPPORT:
-    # Extra clarification currently uses terminal input(), so the web path
-    # only uses the startup questions already collected in the frontend.
-    if force_clarification and startup_clarifications is None:
-        clarifications = _run_required_stage(
-            "Requirement Clarification",
-            extract_requirements,
-            user_prompt,
-            intent,
-            True,
-            clarifications,
-        )
-    else:
-        if config.VERBOSE:
-            print(f"  ✅  Confidence {confidence:.0%} — skipping extra clarification.")
 
     # Apply app name from clarifications if provided
     app_name_answer = clarifications.get("app_name", {}).get("answer", "")
@@ -289,6 +363,9 @@ def run_planning_pipeline(
     _separator("Database Planning")
     db_data = _run_required_stage("Database Planning", plan_database, intent, features_data, backend_data)
     plan.database_tables = db_data.get("tables", [])
+    plan.backend["firestore_collections"] = [
+        table.get("name") for table in plan.database_tables if table.get("name")
+    ]
 
     # ── Stage 8a: Architecture ───────────────────────────────
     _separator("Flutter Architecture Planning")
@@ -301,9 +378,9 @@ def run_planning_pipeline(
         "cart_strategy":           arch_data.get("cart_strategy", "server"),
         "folder_structure":        arch_data.get("folder_structure", []),
         "navigation_package":      arch_data.get("navigation_package", "go_router"),
-        "network_layer":           arch_data.get("network_layer", "dio"),
-        "local_database":          arch_data.get("local_database", "isar"),
-        "offline_first":           arch_data.get("offline_first", False),
+        "network_layer":           arch_data.get("network_layer", "firebase_sdk"),
+        "local_database":          arch_data.get("local_database", "firestore_offline_cache"),
+        "offline_first":           arch_data.get("offline_first", True),
         "modular":                 arch_data.get("modular", True),
         "flavors":                 arch_data.get("flavors", []),
     }
@@ -326,7 +403,9 @@ def run_planning_pipeline(
 
     # ── Stage 9: Validation + Repair ────────────────────────
     _separator("Plan Validation")
+    _enforce_firebase_plan(plan)
     _validate_and_repair(plan)
+    _enforce_firebase_plan(plan)
 
     elapsed = time.time() - start
     print(f"\n{'═' * 60}")

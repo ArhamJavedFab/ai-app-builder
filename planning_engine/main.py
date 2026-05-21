@@ -89,6 +89,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Suppress verbose step-by-step logs",
     )
     parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="Disable deterministic rule-based fallback for domain classification",
+    )
+    parser.add_argument(
         "--chat",
         action="store_true",
         help="Open chat edit mode after generating the plan",

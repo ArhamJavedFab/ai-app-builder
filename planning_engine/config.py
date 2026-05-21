@@ -79,7 +79,7 @@ FLUTTER_ARCH_OPTIONS        = [
     "mvvm",
 ]
 FLUTTER_NETWORK_OPTIONS     = ["firebase"]
-FLUTTER_LOCAL_DB_OPTIONS    = ["isar", "hive", "sqflite", "drift"]
+FLUTTER_LOCAL_DB_OPTIONS    = ["firestore_offline_cache"]
 FLUTTER_NAV_OPTIONS         = ["go_router", "auto_route", "navigator_2"]
 
 # ── Output ────────────────────────────────────────────────────

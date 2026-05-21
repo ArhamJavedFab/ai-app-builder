@@ -39,7 +39,17 @@ def _enforce_firebase_architecture(result: dict, backend: dict | None = None) ->
 
     result["flutter_dependencies"] = [
         dep for dep in dependencies
-        if str(dep.get("package", "")).lower() not in {"dio", "http", "chopper", "flutter_secure_storage"}
+        if str(dep.get("package", "")).lower() not in {
+            "dio",
+            "http",
+            "chopper",
+            "flutter_secure_storage",
+            "isar",
+            "isar_flutter_libs",
+            "sqflite",
+            "drift",
+            "hive",
+        }
     ]
     return result
 
