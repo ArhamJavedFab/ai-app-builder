@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import PLAN_PATCHER
+from core.prompt_loader import load_prompt_template
 from core.summary import print_concise_summary, save_summary
 from validation.validator import validate_plan
+
+PLAN_PATCHER = load_prompt_template("plan_patcher.md")
 
 
 def load_plan(path: str | Path) -> dict[str, Any]:

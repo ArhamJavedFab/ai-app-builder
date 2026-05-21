@@ -9,7 +9,7 @@ from core.schema import MasterPlan, empty_plan
 from core.gemini_client import call_gemini_json
 from core.app_name_suggester import suggest_app_name
 from core.plan_editor import apply_patch
-from core.prompt_templates import PLAN_REPAIRER
+from core.prompt_loader import load_prompt_template
 from agents.intent_analyzer       import analyze_intent
 from agents.requirement_extractor import (
     ask_required_startup_questions,
@@ -23,6 +23,8 @@ from agents.database_planner      import plan_database
 from agents.architecture_planner  import plan_architecture, plan_design_system
 from validation.validator         import validate_plan
 import config
+
+PLAN_REPAIRER = load_prompt_template("plan_repairer.md")
 
 
 def _separator(label: str) -> None:

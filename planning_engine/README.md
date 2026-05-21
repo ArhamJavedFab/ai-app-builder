@@ -13,7 +13,8 @@ planning_engine/
 │
 ├── core/
 │   ├── gemini_client.py       # Gemini API wrapper (fast + pro models)
-│   ├── prompt_templates.py    # All agent prompts (one file, easy to tune)
+│   ├── prompt_loader.py       # Loads agent prompts from markdown files
+│   ├── prompts/               # Agent prompt markdown files
 │   └── schema.py              # MasterPlan dataclass — the output contract
 │
 ├── agents/

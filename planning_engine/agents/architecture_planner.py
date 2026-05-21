@@ -6,8 +6,11 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import ARCHITECTURE_PLANNER, DESIGN_SYSTEM_PLANNER
+from core.prompt_loader import load_prompt_template
 import config
+
+ARCHITECTURE_PLANNER = load_prompt_template("architecture_planner.md")
+DESIGN_SYSTEM_PLANNER = load_prompt_template("design_system_planner.md")
 
 
 def _dependency_names(dependencies: list[dict]) -> set[str]:

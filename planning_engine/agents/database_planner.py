@@ -6,8 +6,10 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import DATABASE_PLANNER
+from core.prompt_loader import load_prompt_template
 import config
+
+DATABASE_PLANNER = load_prompt_template("database_planner.md")
 
 
 def _enforce_firestore_database(result: dict) -> dict:

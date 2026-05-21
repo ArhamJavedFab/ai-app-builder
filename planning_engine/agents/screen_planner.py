@@ -6,8 +6,10 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import SCREEN_PLANNER
+from core.prompt_loader import load_prompt_template
 import config
+
+SCREEN_PLANNER = load_prompt_template("screen_planner.md")
 
 
 def plan_screens(intent: dict, features: dict) -> dict:

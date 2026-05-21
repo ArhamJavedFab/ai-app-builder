@@ -6,8 +6,10 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
-from core.prompt_templates import BACKEND_PLANNER
+from core.prompt_loader import load_prompt_template
 import config
+
+BACKEND_PLANNER = load_prompt_template("backend_planner.md")
 
 
 def _enforce_firebase_backend(result: dict) -> dict:
