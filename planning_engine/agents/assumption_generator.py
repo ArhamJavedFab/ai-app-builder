@@ -51,6 +51,11 @@ def _parse_screen_names(prompt: str) -> list[str]:
 
 
 def _local_storage_assumption(prompt: str, intent: dict) -> str:
+    if intent.get("data_tier") == "local_only" or intent.get("needs_backend") is False:
+        return (
+            "Store and read photos from the device only using platform gallery APIs. "
+            "No cloud database or user accounts."
+        )
     return (
         "Use Firebase Cloud Firestore as the backend database. "
         "Use Firestore offline persistence for local caching only."
@@ -74,7 +79,7 @@ def _navigation_assumption(prompt: str) -> str:
 
 
 def _has_local_only_requirements(prompt: str, intent: dict) -> bool:
-    return False
+    return intent.get("data_tier") == "local_only" or intent.get("needs_backend") is False
 
 
 def _has_no_auth_requirement(prompt: str, intent: dict) -> bool:
@@ -102,7 +107,7 @@ def generate_assumptions(prompt: str, intent: dict, clarifications: dict | None 
         "screens": screen_names,
         "screen_count": screen_count or len(screen_names),
         "no_auth": _has_no_auth_requirement(prompt, intent),
-        "no_backend": False,
+        "no_backend": _has_local_only_requirements(prompt, intent),
         "data_storage": _local_storage_assumption(prompt, intent),
         "authentication": _authentication_assumption(prompt, intent),
         "navigation": _navigation_assumption(prompt),

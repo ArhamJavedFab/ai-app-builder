@@ -40,6 +40,7 @@ class FlutterArchitecture:
 
 @dataclass
 class Screen:
+    id: str                     = ""
     name: str                   = ""
     route: str                  = ""
     purpose: str                = ""
@@ -97,6 +98,13 @@ class Monetization:
 
 @dataclass
 class MasterPlan:
+    # ── Plan contract (stable identity across phases)
+    plan_version: str                   = "1.1"
+    project_id: str                     = ""
+    updated_at: str                     = ""
+    data_tier: str                      = ""          # local_only | firebase
+    storage_profile: str              = ""          # alarm | notes | tasks | media | generic | firebase
+
     # ── Identity
     app_name: str                       = ""
     app_type: str                       = ""          # ecommerce | social | productivity | etc.
@@ -112,6 +120,10 @@ class MasterPlan:
     features: list                      = field(default_factory=list)   # {module, items[], priority}
     mvp_features: list                  = field(default_factory=list)
     post_mvp_features: list             = field(default_factory=list)
+    mvp_feature_ids: list               = field(default_factory=list)
+    post_mvp_feature_ids: list          = field(default_factory=list)
+    user_flows: list                    = field(default_factory=list)
+    reusable_components: list           = field(default_factory=list)
 
     # ── Screens
     screens: list[dict]                 = field(default_factory=list)   # Screen dicts
@@ -161,8 +173,11 @@ class MasterPlan:
         return json.dumps(self.to_dict(), indent=indent)
 
     def save(self, path: str) -> None:
+        from core.plan_ids import normalize_plan_ids
+
+        payload = normalize_plan_ids(self.to_dict())
         with open(path, "w", encoding="utf-8") as f:
-            f.write(self.to_json())
+            f.write(json.dumps(payload, indent=2))
         print(f"  ✅  Plan saved → {path}")
 
 

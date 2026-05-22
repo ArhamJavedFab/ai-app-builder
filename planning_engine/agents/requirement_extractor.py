@@ -212,6 +212,38 @@ def _fallback_smart_questions(intent: dict) -> dict:
             ],
         }
 
+    if domain == "media":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "PicFlow",
+                "domain": "media",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A photo gallery app for browsing images on the device.",
+            },
+            "questions": [
+                {
+                    "id": "image_source",
+                    "question": "Where will the app get images from?",
+                    "options": [
+                        "Only from the device's local storage",
+                        "From local storage and a linked cloud service",
+                        "From a dedicated app-specific cloud storage",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "gallery_features",
+                    "question": "What should users be able to do with photos?",
+                    "options": [
+                        "View and browse only",
+                        "Browse, favorite, and organize into albums",
+                        "Browse, edit, share, and organize",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
     if domain in ("health", "fitness"):
         return {
             "auto_answered": {
@@ -238,6 +270,216 @@ def _fallback_smart_questions(intent: dict) -> dict:
                         "Workouts and exercises",
                         "Diet and nutrition",
                         "Both workouts and nutrition",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "social":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "ConnectApp",
+                "domain": "social",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A social app for connecting users through posts, chat, or feeds.",
+            },
+            "questions": [
+                {
+                    "id": "social_format",
+                    "question": "What is the main social experience?",
+                    "options": [
+                        "Feed with posts, likes, and comments",
+                        "Direct messaging and group chats",
+                        "Profiles plus follow/friend connections",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "content_types",
+                    "question": "What can users share?",
+                    "options": [
+                        "Text posts only",
+                        "Photos and short videos",
+                        "Text, photos, videos, and links",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "moderation",
+                    "question": "Do you need moderation or reporting?",
+                    "options": [
+                        "Yes — report content and block users",
+                        "Basic block/report only",
+                        "No moderation for MVP",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "productivity":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "TaskFlow",
+                "domain": "productivity",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A productivity app for tasks, habits, notes, or planning.",
+            },
+            "questions": [
+                {
+                    "id": "productivity_focus",
+                    "question": "What is the core productivity use case?",
+                    "options": [
+                        "To-do lists and task management",
+                        "Habit tracking and daily routines",
+                        "Notes, journals, or documents",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "sync_needs",
+                    "question": "Should data sync across devices?",
+                    "options": [
+                        "Local only on this device",
+                        "Cloud sync with user accounts",
+                        "Optional account — works offline first",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "reminders",
+                    "question": "Do you need reminders or notifications?",
+                    "options": [
+                        "Yes — scheduled reminders and alerts",
+                        "Only in-app, no push notifications",
+                        "No reminders for MVP",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "education":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "LearnHub",
+                "domain": "education",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "An education or learning app with lessons, courses, or quizzes.",
+            },
+            "questions": [
+                {
+                    "id": "learning_format",
+                    "question": "How is content delivered?",
+                    "options": [
+                        "Self-paced video or reading lessons",
+                        "Quizzes and assessments with scores",
+                        "Live classes or scheduled sessions",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "user_roles_edu",
+                    "question": "Who creates or manages content?",
+                    "options": [
+                        "Admin/instructor only — learners consume",
+                        "Instructors plus enrolled students",
+                        "Peer learning — students can contribute",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "progress_tracking",
+                    "question": "How should progress be tracked?",
+                    "options": [
+                        "Completion badges and course progress %",
+                        "Grades, quiz scores, and certificates",
+                        "Simple checklist — no certificates",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "finance":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "MoneyTrack",
+                "domain": "finance",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A personal finance app for budgets, expenses, or money tracking.",
+            },
+            "questions": [
+                {
+                    "id": "finance_scope",
+                    "question": "What is the main money feature?",
+                    "options": [
+                        "Expense tracking and spending categories",
+                        "Monthly budgets and savings goals",
+                        "Bills, subscriptions, and reminders",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "accounts_finance",
+                    "question": "Single user or shared household?",
+                    "options": [
+                        "One personal wallet/profile only",
+                        "Shared family or household budget",
+                        "Multiple accounts with switching",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "bank_linking",
+                    "question": "How is transaction data entered?",
+                    "options": [
+                        "Manual entry only",
+                        "Import CSV or bank statements later",
+                        "Bank API / open banking integration",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+            ],
+        }
+
+    if domain == "marketplace":
+        return {
+            "auto_answered": {
+                "app_name": intent.get("app_name") or "MarketPlace",
+                "domain": "marketplace",
+                "platform": "Flutter mobile app",
+                "inferred_notes": "A multi-seller marketplace where vendors list and buyers purchase.",
+            },
+            "questions": [
+                {
+                    "id": "listing_type",
+                    "question": "What are sellers listing?",
+                    "options": [
+                        "Physical goods with shipping",
+                        "Services or bookings (freelancers, gigs)",
+                        "Both products and services",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "seller_onboarding",
+                    "question": "How do sellers join?",
+                    "options": [
+                        "Open signup — anyone can list",
+                        "Admin approval before listings go live",
+                        "Invite-only sellers for MVP",
+                        "Let AI decide based on my idea",
+                    ],
+                },
+                {
+                    "id": "payments_marketplace",
+                    "question": "How do buyers pay sellers?",
+                    "options": [
+                        "In-app online payment with platform fee",
+                        "Cash on delivery / pay outside app",
+                        "Escrow — pay in app, release after delivery",
                         "Let AI decide based on my idea",
                     ],
                 },

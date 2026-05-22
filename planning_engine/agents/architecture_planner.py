@@ -6,8 +6,21 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.plan_profile import apply_local_architecture_result
 from core.prompt_loader import load_prompt_template
 import config
+
+LOCAL_ARCHITECTURE_RULES = """
+LOCAL-ONLY OVERRIDE (data_tier is local_only — MUST follow):
+- Read storage_profile from intent (alarm | notes | tasks | media | generic).
+- Do NOT use Firebase, Firestore, firebase_auth, or any firebase_* packages.
+- NEVER use device_gallery or photo_manager unless storage_profile is media.
+- alarm → isar + flutter_local_notifications + timezone
+- notes → isar
+- tasks/generic → hive
+- cart_strategy must be "local", never "firestore".
+- security_rules must match the app (notification permissions for alarms, NOT gallery permissions).
+"""
 
 ARCHITECTURE_PLANNER = load_prompt_template("architecture_planner.md")
 DESIGN_SYSTEM_PLANNER = load_prompt_template("design_system_planner.md")
@@ -76,11 +89,18 @@ def plan_architecture(intent: dict, features: dict, backend: dict | None = None)
         augmented_intent["_cart_has_backend_endpoint"] = has_cart_endpoint
         augmented_intent["_payment_method"] = backend.get("payment_method", "")
 
-    filled = ARCHITECTURE_PLANNER.format(
+    prompt = ARCHITECTURE_PLANNER.format(
         intent_json=json.dumps(augmented_intent, indent=2),
         features_json=json.dumps(features, indent=2),
     )
-    result = _enforce_firebase_architecture(call_gemini_json(filled, use_pro=True), backend)
+    if augmented_intent.get("data_tier") == "local_only":
+        prompt = f"{prompt}\n\n{LOCAL_ARCHITECTURE_RULES}"
+
+    result = call_gemini_json(prompt, use_pro=True)
+    if augmented_intent.get("data_tier") == "local_only":
+        result = apply_local_architecture_result(result, augmented_intent)
+    else:
+        result = _enforce_firebase_architecture(result, backend)
 
     if config.VERBOSE:
         state  = result.get("state_management", "unknown")

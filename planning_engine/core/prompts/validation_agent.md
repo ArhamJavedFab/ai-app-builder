@@ -22,14 +22,16 @@ Full Plan:
 {plan_json}
 
 Check ONLY for these concrete issues:
-1. Screen name appears more than once in the screens array â†’ critical
-2. A route in bottom_tabs does not exist in the routes array â†’ critical
-3. Auth provider is set but no LoginScreen exists in screens â†’ critical
-4. needs_payment_gateway is true but no payments/transactions table exists â†’ warning
-5. needs_payment_gateway is false (COD) â†’ do NOT flag missing payments table, this is correct
-6. backend_type is not "firebase" or auth_provider is not "firebase_auth" â†’ critical
-7. If backend_type is "firebase", api_endpoints must be []; do not require endpoint matches for Firebase SDK api_calls
-8. network_layer is not "firebase_sdk" or local_database is not "firestore_offline_cache" â†’ critical
+1. Screen name appears more than once in the screens array → critical
+2. A route in bottom_tabs does not exist in the routes array → critical
+3. Auth provider is firebase_auth (or needs_auth is true) but no LoginScreen exists → critical
+   - Do NOT flag missing LoginScreen when data_tier is "local_only" or auth_provider is "none"
+4. needs_payment_gateway is true but no payments/transactions table exists → warning
+5. needs_payment_gateway is false (COD) → do NOT flag missing payments table, this is correct
+6. For data_tier "firebase" only: backend_type must be "firebase", auth_provider "firebase_auth", api_endpoints []
+7. For data_tier "local_only": needs_backend should be false, auth_provider "none", no Firebase required
+8. For firebase plans: network_layer "firebase_sdk", local_database "firestore_offline_cache"
+9. For local_only plans: network_layer "device_storage", local_database "device_gallery" — do NOT require Firebase
 9. primary_color and background_color are both close to the same hue (contrast issue) â†’ warning
 10. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" â†’ warning
 11. ErrorScreen is missing from screens â†’ suggestion

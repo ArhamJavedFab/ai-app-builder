@@ -11,6 +11,12 @@ import config
 
 SCREEN_PLANNER = load_prompt_template("screen_planner.md")
 
+LOCAL_SCREEN_RULES = """
+LOCAL-ONLY (data_tier is local_only):
+- Set api_calls to "Local Storage: <action>" (e.g. "Local Storage: read all alarms") — NOT Firestore or Firebase.
+- Do NOT add LoginScreen unless needs_auth is true.
+"""
+
 
 def plan_screens(intent: dict, features: dict) -> dict:
     """
@@ -20,11 +26,13 @@ def plan_screens(intent: dict, features: dict) -> dict:
     if config.VERBOSE:
         print("  📱  Planning screens...")
 
-    filled = SCREEN_PLANNER.format(
+    prompt = SCREEN_PLANNER.format(
         intent_json=json.dumps(intent, indent=2),
         features_json=json.dumps(features, indent=2),
     )
-    result = call_gemini_json(filled, use_pro=False)
+    if intent.get("data_tier") == "local_only":
+        prompt = f"{prompt}\n\n{LOCAL_SCREEN_RULES}"
+    result = call_gemini_json(prompt, use_pro=False)
 
     if config.VERBOSE:
         screens    = len(result.get("screens", []))

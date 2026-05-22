@@ -9,6 +9,12 @@ from core.schema import MasterPlan, empty_plan
 from core.gemini_client import call_gemini_json
 from core.app_name_suggester import suggest_app_name
 from core.plan_editor import apply_patch
+from core.plan_ids import normalize_plan_ids
+from core.plan_profile import (
+    enrich_intent_for_planners,
+    is_local_first_plan,
+    reconcile_plan_with_intent,
+)
 from core.prompt_loader import load_prompt_template
 from agents.intent_analyzer       import analyze_intent
 from agents.requirement_extractor import (
@@ -72,6 +78,12 @@ def _apply_plan_dict(plan: MasterPlan, data: dict) -> None:
             setattr(plan, key, data[key])
 
 
+def _finalize_plan_ids(plan: MasterPlan) -> None:
+    """Assign stable ids and cross-references before save / handoff."""
+    normalized = normalize_plan_ids(plan.to_dict())
+    _apply_plan_dict(plan, normalized)
+
+
 def _wants_suggested_name(answer: str) -> bool:
     normalized = answer.strip().lower()
     suggestion_terms = {
@@ -109,13 +121,31 @@ def _apply_plan_patches(plan: MasterPlan, repair_result: dict) -> None:
         except Exception as e:
             print(f"      ⚠️  Skipping bad patch {patch}: {e}")
     _apply_plan_dict(plan, updated)
+    _finalize_plan_ids(plan)
+
+
+def _apply_plan_profile(
+    plan: MasterPlan,
+    intent: dict,
+    clarifications: dict | None = None,
+    user_prompt: str = "",
+) -> None:
+    """Apply local-only or Firebase constraints from intent — never fight repairs."""
+    if intent.get("data_tier") == "local_only":
+        data = plan.to_dict()
+        reconcile_plan_with_intent(data, intent, user_prompt, clarifications)
+        _apply_plan_dict(plan, data)
+        return
+    _enforce_firebase_plan(plan)
 
 
 def _enforce_firebase_plan(plan: MasterPlan) -> None:
     """
-    Final safety rail: this planner targets Firebase only.
-    Keep generated plans from falling back to REST clients or local DB engines.
+    Safety rail for cloud-backed apps: Firebase SDKs, no REST clients.
+    Skipped when data_tier is local_only.
     """
+    if is_local_first_plan(plan.to_dict()):
+        return
     backend = dict(plan.backend or {})
     services = set(backend.get("firebase_services") or [])
     services.update({"firebase_auth", "cloud_firestore"})
@@ -195,7 +225,12 @@ def _enforce_firebase_plan(plan: MasterPlan) -> None:
     ]
 
 
-def _validate_and_repair(plan: MasterPlan) -> None:
+def _validate_and_repair(
+    plan: MasterPlan,
+    intent: dict,
+    clarifications: dict | None = None,
+    user_prompt: str = "",
+) -> None:
     """
     Validate the plan. If it fails, attempt repairs up to
     MAX_VALIDATION_REPAIR_ATTEMPTS times.
@@ -285,6 +320,7 @@ def _validate_and_repair(plan: MasterPlan) -> None:
 def run_planning_pipeline(
     user_prompt: str,
     startup_clarifications: dict | None = None,
+    use_intent_fallback: bool = True,
 ) -> MasterPlan:
     """
     Runs the full multi-agent planning pipeline.
@@ -295,7 +331,12 @@ def run_planning_pipeline(
 
     # ── Stage 1: Intent ──────────────────────────────────────
     _separator("Intent Analysis")
-    intent = _run_required_stage("Intent Analysis", analyze_intent, user_prompt)
+    intent = _run_required_stage(
+        "Intent Analysis",
+        analyze_intent,
+        user_prompt,
+        use_fallback=use_intent_fallback,
+    )
 
     plan.app_name     = intent.get("app_name", "")
     plan.app_type     = intent.get("app_type", "")
@@ -329,6 +370,19 @@ def run_planning_pipeline(
         clarifications,
     )
 
+    intent = enrich_intent_for_planners(intent, clarifications, user_prompt)
+    plan.data_tier = intent.get("data_tier", "firebase")
+    plan.storage_profile = intent.get("storage_profile", "")
+    if config.VERBOSE:
+        if plan.data_tier == "local_only":
+            profile = intent.get("storage_profile", "generic")
+            print(
+                f"  📌  Data profile: local-only | storage: {profile} "
+                "(on-device, no Firebase)"
+            )
+        else:
+            print("  📌  Data profile: firebase (cloud backend)")
+
     # Apply app name from clarifications if provided
     app_name_answer = clarifications.get("app_name", {}).get("answer", "")
     if app_name_answer and _wants_suggested_name(app_name_answer):
@@ -351,6 +405,7 @@ def run_planning_pipeline(
     _separator("Screen Planning")
     screens_data = _run_required_stage("Screen Planning", plan_screens, intent, features_data)
     plan.screens = screens_data.get("screens", [])
+    plan.reusable_components = screens_data.get("reusable_components", [])
 
     # ── Stage 5: Navigation ──────────────────────────────────
     _separator("Navigation Planning")
@@ -358,12 +413,30 @@ def run_planning_pipeline(
 
     # ── Stage 6: Backend ─────────────────────────────────────
     _separator("Backend Planning")
-    backend_data = _run_required_stage("Backend Planning", plan_backend, intent, features_data, screens_data)
+    backend_data = _run_required_stage(
+        "Backend Planning",
+        plan_backend,
+        intent,
+        features_data,
+        screens_data,
+        clarifications,
+        user_prompt,
+    )
     plan.backend = backend_data
+    if intent.get("data_tier") == "local_only":
+        _apply_plan_profile(plan, intent, clarifications, user_prompt)
 
     # ── Stage 7: Database ────────────────────────────────────
     _separator("Database Planning")
-    db_data = _run_required_stage("Database Planning", plan_database, intent, features_data, backend_data)
+    db_data = _run_required_stage(
+        "Database Planning",
+        plan_database,
+        intent,
+        features_data,
+        backend_data,
+        clarifications,
+        user_prompt,
+    )
     plan.database_tables = db_data.get("tables", [])
     plan.backend["firestore_collections"] = [
         table.get("name") for table in plan.database_tables if table.get("name")
@@ -392,6 +465,8 @@ def run_planning_pipeline(
     plan.security_rules       = arch_data.get("security_rules", [])
     plan.performance_notes    = arch_data.get("performance_notes", [])
     plan.accessibility_notes  = arch_data.get("accessibility_notes", [])
+    if intent.get("data_tier") == "local_only":
+        _apply_plan_profile(plan, intent, clarifications, user_prompt)
 
     # ── Stage 8b: Design System ──────────────────────────────
     _separator("Design System Planning")
@@ -405,9 +480,11 @@ def run_planning_pipeline(
 
     # ── Stage 9: Validation + Repair ────────────────────────
     _separator("Plan Validation")
-    _enforce_firebase_plan(plan)
-    _validate_and_repair(plan)
-    _enforce_firebase_plan(plan)
+    _finalize_plan_ids(plan)
+    _apply_plan_profile(plan, intent, clarifications, user_prompt)
+    _validate_and_repair(plan, intent, clarifications, user_prompt)
+    _apply_plan_profile(plan, intent, clarifications, user_prompt)
+    _finalize_plan_ids(plan)
 
     elapsed = time.time() - start
     print(f"\n{'═' * 60}")

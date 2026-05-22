@@ -10,6 +10,9 @@ venv/
 env/
 planning_engine/.venv/
 
+.cursor
+.cursor.*
+
 # Python cache / build artifacts
 __pycache__/
 *.py[cod]

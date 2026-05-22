@@ -1,10 +1,10 @@
 ---
-id: plan_repairer_v1
+id: plan_repairer_v2
 agent: Plan Repairer
 title: Plan Repairer
 description: Generates small JSON patches to repair validation issues
 tags: [planning, flutter, prompt]
-version: 1.0
+version: 2.0
 inputs:
   - validation_json
   - plan_json
@@ -27,28 +27,48 @@ Current plan:
 {plan_json}
 
 REPAIR RULES:
-1. For "auth_required: false but roles non-empty" â†’ patch that endpoint's roles to [].
-2. For non-Firebase backend/auth â†’ set backend_type to "firebase", auth_provider to "firebase_auth", and api_endpoints to [].
-3. For non-Firebase architecture â†’ set flutter_architecture.network_layer to "firebase_sdk" and flutter_architecture.local_database to "firestore_offline_cache".
-4. For "cart_strategy mismatch" â†’ patch flutter_architecture.cart_strategy to match what backend has.
-5. For "design color inconsistency" â†’ patch design_system.primary_color to the user's specified color.
-6. For "missing ErrorScreen" â†’ append a minimal ErrorScreen to screens and /error to navigation.routes.
-7. For "bottom_tab route not in routes" â†’ append the missing route to navigation.routes.
-8. For "missing LoginScreen" â†’ append LoginScreen to screens and /login to navigation.routes.
-9. Never remove existing screens or tables - only add or patch.
+1. Check `data_tier` on the plan first.
+2. If `data_tier` is `local_only` (or `backend.needs_backend` is false):
+   - Set `backend.auth_provider` to `"none"`, `backend.needs_backend` to false, `backend.backend_type` to `"local"`.
+   - Set `backend.firebase_services` to `[]`, `backend.api_endpoints` to `[]`.
+   - Do NOT add LoginScreen — local gallery apps have no auth.
+   - Set `flutter_architecture.network_layer` to `"device_storage"` and `local_database` to `"device_gallery"`.
+   - Missing IDs: use `target` patches (see below), not `/screens/N/id` paths.
+3. If `data_tier` is `firebase` (cloud app):
+   - For non-Firebase backend/auth → set `backend_type` to `"firebase"`, `auth_provider` to `"firebase_auth"`, `api_endpoints` to `[]`.
+   - For missing LoginScreen when auth is required → append LoginScreen and `/login` route.
+   - Set `network_layer` to `"firebase_sdk"` and `local_database` to `"firestore_offline_cache"`.
+4. For "auth_required: false but roles non-empty" → patch that endpoint's roles to `[]`.
+5. For "cart_strategy mismatch" → align `flutter_architecture.cart_strategy` with backend.
+6. For "design color inconsistency" → patch `design_system.primary_color`.
+7. For "missing ErrorScreen" → append minimal ErrorScreen and `/error` route.
+8. For "bottom_tab route not in routes" → append the missing route.
+9. Never remove existing screens unless the validation error explicitly requires it.
 
-Return ONLY valid JSON with small patches:
+Prefer **target-based** patches for list items (IDs are assigned automatically):
+```json
+{{
+  "op": "set",
+  "target": {{ "collection": "screens", "id": "<scr_ from plan>" }},
+  "field": "widgets",
+  "value": ["..."]
+}}
+```
+
+For top-level fields, use JSON Pointer `path` (e.g. `/backend/auth_provider`).
+
+Return ONLY valid JSON:
 {{
   "summary": "<one sentence describing the repairs made>",
   "patches": [
     {{
       "op":    "<set|append|remove>",
-      "path":  "<JSON Pointer e.g. /backend/api_endpoints>",
-      "value": <the corrected value>
+      "path":  "<JSON Pointer OR use target+field>",
+      "target": {{ "collection": "screens", "id": "..." }},
+      "field": "<field name>",
+      "value": <corrected value>
     }}
   ]
 }}
 
-Use "append" to add items to arrays.
-Use "set" to overwrite a specific field or index.
-Return the minimum patches needed - do not return the full plan.
+Return the minimum patches needed — not the full plan.

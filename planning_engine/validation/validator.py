@@ -17,6 +17,7 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.plan_profile import is_local_first_plan
 from core.prompt_loader import load_prompt_template
 import config
 
@@ -49,36 +50,103 @@ def _rule_based_checks(plan: dict) -> list[dict]:
     # Collect all endpoint paths for cross-referencing
     endpoints      = {e.get("path", "") for e in backend.get("api_endpoints", [])}
 
-    if backend_type and backend_type != "firebase":
+    local_first = is_local_first_plan(plan)
+
+    if not local_first:
+        if backend_type and backend_type != "firebase":
+            issues.append(_issue(
+                "critical", "backend",
+                f"backend_type is '{backend_type}', but cloud-backed plans must use Firebase.",
+                "Set backend.backend_type to 'firebase'.",
+            ))
+        if backend.get("auth_provider") not in ("", "firebase_auth"):
+            issues.append(_issue(
+                "critical", "backend",
+                f"auth_provider is '{backend.get('auth_provider')}', but cloud plans must use Firebase Auth.",
+                "Set backend.auth_provider to 'firebase_auth'.",
+            ))
+        if backend.get("api_endpoints"):
+            issues.append(_issue(
+                "critical", "backend",
+                "backend.api_endpoints is not empty, but Firebase plans must use SDK calls instead of REST endpoints.",
+                "Set backend.api_endpoints to [].",
+            ))
+        if arch.get("network_layer") not in ("", "firebase_sdk"):
+            issues.append(_issue(
+                "critical", "architecture",
+                f"network_layer is '{arch.get('network_layer')}', but Firebase SDKs must be used.",
+                "Set flutter_architecture.network_layer to 'firebase_sdk'.",
+            ))
+        if arch.get("local_database") not in ("", "firestore_offline_cache"):
+            issues.append(_issue(
+                "critical", "architecture",
+                f"local_database is '{arch.get('local_database')}', but Firestore offline cache must be used.",
+                "Set flutter_architecture.local_database to 'firestore_offline_cache'.",
+            ))
+    else:
+        if backend.get("needs_backend") is True:
+            issues.append(_issue(
+                "warning", "backend",
+                "Local-only app has needs_backend: true.",
+                "Set backend.needs_backend to false.",
+            ))
+        if backend.get("auth_provider") not in ("", "none"):
+            issues.append(_issue(
+                "warning", "backend",
+                f"Local-only app should not use auth_provider '{backend.get('auth_provider')}'.",
+                "Set backend.auth_provider to 'none'.",
+            ))
+
+    # ── 0. Stable IDs ─────────────────────────────────────────
+    if not plan.get("project_id"):
         issues.append(_issue(
-            "critical", "backend",
-            f"backend_type is '{backend_type}', but this planner must use Firebase.",
-            "Set backend.backend_type to 'firebase'.",
+            "warning", "schema",
+            "plan.project_id is missing.",
+            "Run normalize_plan_ids or regenerate the plan.",
         ))
-    if backend.get("auth_provider") not in ("", "firebase_auth"):
-        issues.append(_issue(
-            "critical", "backend",
-            f"auth_provider is '{backend.get('auth_provider')}', but this planner must use Firebase Auth.",
-            "Set backend.auth_provider to 'firebase_auth'.",
-        ))
-    if backend.get("api_endpoints"):
-        issues.append(_issue(
-            "critical", "backend",
-            "backend.api_endpoints is not empty, but Firebase plans must use SDK calls instead of REST endpoints.",
-            "Set backend.api_endpoints to [].",
-        ))
-    if arch.get("network_layer") not in ("", "firebase_sdk"):
-        issues.append(_issue(
-            "critical", "architecture",
-            f"network_layer is '{arch.get('network_layer')}', but Firebase SDKs must be used.",
-            "Set flutter_architecture.network_layer to 'firebase_sdk'.",
-        ))
-    if arch.get("local_database") not in ("", "firestore_offline_cache"):
-        issues.append(_issue(
-            "critical", "architecture",
-            f"local_database is '{arch.get('local_database')}', but Firestore offline cache must be used.",
-            "Set flutter_architecture.local_database to 'firestore_offline_cache'.",
-        ))
+
+    def _dup_ids(items: list, label: str) -> None:
+        seen_ids: dict[str, int] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            eid = item.get("id", "")
+            if not eid:
+                issues.append(_issue(
+                    "warning", "schema",
+                    f"{label} entry is missing 'id'.",
+                    "Run normalize_plan_ids on the plan.",
+                ))
+                continue
+            seen_ids[eid] = seen_ids.get(eid, 0) + 1
+        for eid, count in seen_ids.items():
+            if count > 1:
+                issues.append(_issue(
+                    "critical", "schema",
+                    f"Duplicate {label} id '{eid}' appears {count} times.",
+                    f"Ensure all {label} ids are unique.",
+                ))
+
+    _dup_ids(screens, "screen")
+    _dup_ids(plan.get("database_tables", []), "database_table")
+
+    screen_ids = {s.get("id") for s in screens if isinstance(s, dict) and s.get("id")}
+    for route in nav.get("routes", []):
+        if not isinstance(route, dict):
+            continue
+        sid = route.get("screen_id", "")
+        if sid and sid not in screen_ids:
+            issues.append(_issue(
+                "critical", "navigation",
+                f"Route '{route.get('path','')}' references unknown screen_id '{sid}'.",
+                "Set screen_id to a valid id from screens[].id.",
+            ))
+        elif route.get("screen") and not sid:
+            issues.append(_issue(
+                "warning", "navigation",
+                f"Route '{route.get('path','')}' has screen name but no screen_id.",
+                "Run normalize_plan_ids to link screen_id.",
+            ))
 
     # ── 1. Duplicate screen names ─────────────────────────────
     seen = {}
@@ -103,7 +171,12 @@ def _rule_based_checks(plan: dict) -> list[dict]:
 
     # ── 3. Auth configured but no login screen ────────────────
     auth_provider = backend.get("auth_provider", "")
-    if auth_provider and auth_provider not in ("none", ""):
+    if (
+        not local_first
+        and auth_provider
+        and auth_provider not in ("none", "")
+        and backend.get("needs_auth") is not False
+    ):
         has_login = any(
             "login" in n.lower() or "signin" in n.lower() or "auth" in n.lower()
             for n in screen_names
@@ -153,19 +226,47 @@ def _rule_based_checks(plan: dict) -> list[dict]:
                 "Use Firebase Auth plus a users Firestore collection for profile data.",
             ))
 
-    # ── 7. Screen api_calls without matching endpoint ─────────
-    for screen in ([] if backend_type == "firebase" else screens):
-        for call in screen.get("api_calls", []):
-            # Extract just the path part (e.g. "GET /api/v1/products" → "/api/v1/products")
-            parts = call.strip().split()
-            path  = parts[-1] if parts else call
-            if path and path not in endpoints:
-                issues.append(_issue(
-                    "warning", "backend",
-                    f"Screen '{screen.get('name','')}' has api_call '{call}' "
-                    f"but '{path}' is not in backend.api_endpoints.",
-                    f"Replace '{call}' with a Firebase SDK action and keep backend.api_endpoints empty.",
-                ))
+    # ── 7. Screen api_calls without matching endpoint (cloud REST only) ──
+    if not local_first:
+        for screen in screens if backend_type != "firebase" else []:
+            for call in screen.get("api_calls", []):
+                call_lower = call.lower()
+                if call_lower.startswith(("local storage:", "firestore:", "firebase")):
+                    continue
+                parts = call.strip().split()
+                path = parts[-1] if parts else call
+                if path and path not in endpoints:
+                    issues.append(_issue(
+                        "warning", "backend",
+                        f"Screen '{screen.get('name','')}' has api_call '{call}' "
+                        f"but '{path}' is not in backend.api_endpoints.",
+                        f"Replace '{call}' with a Firebase SDK action and keep backend.api_endpoints empty.",
+                    ))
+
+    if local_first:
+        arch_db = arch.get("local_database", "")
+        profile = (plan.get("storage_profile") or "").lower()
+        if arch_db == "device_gallery" and profile != "media":
+            issues.append(_issue(
+                "critical", "architecture",
+                f"local_database is '{arch_db}' but storage_profile is '{profile}' (not a gallery app).",
+                "Set flutter_architecture.local_database to match storage_profile (isar/hive).",
+            ))
+        backend_rules = " ".join(str(r) for r in (backend.get("security_rules") or []))
+        if profile != "media" and "gallery" in backend_rules.lower():
+            issues.append(_issue(
+                "critical", "backend",
+                "Local plan has gallery/photo security rules but app is not a media gallery.",
+                "Replace backend.security_rules with profile-appropriate on-device rules.",
+            ))
+        for screen in screens:
+            for call in screen.get("api_calls", []):
+                if "firestore" in call.lower() or "firebase auth" in call.lower():
+                    issues.append(_issue(
+                        "warning", "backend",
+                        f"Local-only plan: screen '{screen.get('name','')}' should not use '{call}'.",
+                        "Use 'Local Storage: ...' actions instead.",
+                    ))
 
     # ── 8. Cart strategy vs backend mismatch ─────────────────
     cart_strategy = arch.get("cart_strategy", "")

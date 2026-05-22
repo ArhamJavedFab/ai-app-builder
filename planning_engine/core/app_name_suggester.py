@@ -27,6 +27,8 @@ def _fallback_app_name(prompt: str, intent: dict) -> str:
         return "WellTrack"
     if "learn" in prompt_lower or "education" in prompt_lower or domain == "education":
         return "LearnLoop"
+    if any(w in prompt_lower for w in ("gallery", "photo", "pics", "picture", "album")) or domain == "media":
+        return "PicFlow"
     if "task" in prompt_lower or "todo" in prompt_lower or domain == "productivity":
         return "TaskPilot"
 

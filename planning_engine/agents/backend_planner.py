@@ -6,6 +6,7 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.plan_profile import build_local_backend, resolve_data_tier
 from core.prompt_loader import load_prompt_template
 import config
 
@@ -42,13 +43,25 @@ def _enforce_firebase_backend(result: dict) -> dict:
     return result
 
 
-def plan_backend(intent: dict, features: dict, screens: dict | None = None) -> dict:
+def plan_backend(
+    intent: dict,
+    features: dict,
+    screens: dict | None = None,
+    clarifications: dict | None = None,
+    user_prompt: str = "",
+) -> dict:
     """
     Stage 6 — Plan backend type, auth, APIs, storage, etc.
     Returns full backend requirements dict.
     """
     if config.VERBOSE:
         print("  ⚙️   Planning backend...")
+
+    if resolve_data_tier(intent, clarifications, user_prompt) == "local_only":
+        result = build_local_backend()
+        if config.VERBOSE:
+            print("      local | auth: none | on-device storage (no Firebase)")
+        return result
 
     filled = BACKEND_PLANNER.format(
         intent_json=json.dumps(intent, indent=2),

@@ -336,7 +336,12 @@ def build_concise_summary(plan: dict[str, Any]) -> dict[str, Any]:
         "mvp_features": plan.get("mvp_features", [])[:8],
         "post_mvp_features": plan.get("post_mvp_features", [])[:5],
         "main_screens": [
-            {"name": s.get("name",""), "route": s.get("route",""), "purpose": s.get("purpose","")}
+            {
+                "id": s.get("id", ""),
+                "name": s.get("name", ""),
+                "route": s.get("route", ""),
+                "purpose": s.get("purpose", ""),
+            }
             for s in screens[:12]
         ],
         "user_flows": [

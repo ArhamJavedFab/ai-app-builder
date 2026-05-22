@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from core.gemini_client import call_gemini_json
+from core.plan_ids import build_id_index, normalize_plan_ids, prepare_patch_for_apply
 from core.prompt_loader import load_prompt_template
 from core.summary import print_concise_summary, save_summary
 from validation.validator import validate_plan
@@ -15,13 +16,15 @@ PLAN_PATCHER = load_prompt_template("plan_patcher.md")
 
 
 def load_plan(path: str | Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    return normalize_plan_ids(raw)
 
 
 def save_plan(plan: dict[str, Any], path: str | Path) -> None:
     plan_path = Path(path)
     plan_path.parent.mkdir(parents=True, exist_ok=True)
-    plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+    normalized = normalize_plan_ids(plan)
+    plan_path.write_text(json.dumps(normalized, indent=2), encoding="utf-8")
 
 
 def _decode_pointer_part(part: str) -> str:
@@ -48,6 +51,7 @@ def _resolve_parent(document: Any, pointer: str) -> tuple[Any, str]:
 
 def apply_patch(plan: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(plan)
+    patch = prepare_patch_for_apply(updated, patch)
     op = patch.get("op")
     path = patch.get("path")
     value = patch.get("value")
@@ -68,8 +72,6 @@ def apply_patch(plan: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
         return updated
 
     if op == "set":
-        if key not in parent:
-            raise ValueError(f"Patch path does not exist: {path}")
         parent[key] = value
     elif op == "append":
         if key not in parent or not isinstance(parent[key], list):
@@ -186,6 +188,11 @@ def _build_patch_context(plan: dict[str, Any], instruction: str) -> dict[str, An
         selected = ["design_system", "features", "screens", "navigation"]
 
     context["sections"] = {section: plan.get(section) for section in selected}
+    context["id_index"] = build_id_index(plan)
+    context["patch_rules"] = (
+        "Prefer patches with target {collection, id} and field (not array indices). "
+        "See id_index for stable ids."
+    )
     context["validation_warnings"] = plan.get("validation_warnings", [])
     return context
 
@@ -217,6 +224,8 @@ def edit_plan(plan: dict[str, Any], instruction: str) -> tuple[dict[str, Any], d
     updated = plan
     for patch in patch_result.get("patches", []):
         updated = apply_patch(updated, patch)
+
+    updated = normalize_plan_ids(updated)
 
     validation = validate_plan(updated, use_llm=False)
     updated["validation_passed"] = validation["validation_passed"]

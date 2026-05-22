@@ -156,7 +156,10 @@ def main() -> None:
             sys.exit(1)
 
         try:
-            master_plan = run_planning_pipeline(prompt)
+            master_plan = run_planning_pipeline(
+                prompt,
+                use_intent_fallback=not args.no_fallback,
+            )
         except RuntimeError as e:
             print(f"\n  {e}\n")
             sys.exit(1)
