@@ -31,10 +31,15 @@ Check ONLY for these concrete issues:
 6. For data_tier "firebase" only: backend_type must be "firebase", auth_provider "firebase_auth", api_endpoints []
 7. For data_tier "local_only": needs_backend should be false, auth_provider "none", no Firebase required
 8. For firebase plans: network_layer "firebase_sdk", local_database "firestore_offline_cache"
-9. For local_only plans: network_layer "device_storage", local_database "device_gallery" — do NOT require Firebase
-9. primary_color and background_color are both close to the same hue (contrast issue) â†’ warning
-10. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" â†’ warning
-11. ErrorScreen is missing from screens â†’ suggestion
+9. For local_only plans: read storage_profile on the plan:
+   - alarm → local_database "isar", notification permissions (NOT gallery)
+   - notes → local_database "isar"
+   - tasks/generic → local_database "hive"
+   - media ONLY → local_database "device_gallery"
+   Do NOT require Firebase. Do NOT flag isar/hive as wrong for alarm or notes apps.
+10. primary_color and background_color are both close to the same hue (contrast issue) → warning
+11. A cart_items or cart table exists in database BUT architecture.cart_strategy is "local" → warning
+12. ErrorScreen is missing from screens → suggestion
 
 Do NOT flag:
 - Missing post_mvp tables (these are intentionally excluded)
@@ -56,7 +61,7 @@ Return ONLY valid JSON:
     }}
   ],
   "missing_info": ["<what the user never specified>"],
-  "assumptions_made": ["<what the AI assumed>"],
+  "assumptions_made": ["<user-relevant product assumptions only — NOT internal validator/repair notes>"],
   "ai_notes": ["<general improvement tips - keep to 3 max>"]
 }}
 

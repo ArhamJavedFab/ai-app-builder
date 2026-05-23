@@ -429,6 +429,47 @@ def apply_local_architecture_result(result: dict, intent: dict) -> dict:
     return result
 
 
+def filter_user_facing_assumptions(
+    assumptions: list,
+    plan: dict[str, Any],
+) -> list[str]:
+    """Drop validator meta-commentary (e.g. stale device_gallery rule mentions)."""
+    profile = (plan.get("storage_profile") or "").lower()
+    cleaned: list[str] = []
+    for raw in assumptions or []:
+        text = str(raw).strip()
+        if not text:
+            continue
+        lower = text.lower()
+        if "validation rule" in lower and "device_gallery" in lower:
+            continue
+        if profile and profile != "media" and "device_gallery" in lower:
+            continue
+        if "typo" in lower and "device_gallery" in lower:
+            continue
+        cleaned.append(text)
+    return cleaned
+
+
+def assumptions_from_clarifications(clarifications: dict | None) -> list[str]:
+    """Human-readable assumptions from the clarification step."""
+    if not clarifications:
+        return []
+    data = clarifications.get("_assumptions_data")
+    if not isinstance(data, dict):
+        return []
+    lines: list[str] = []
+    if data.get("data_storage"):
+        lines.append(str(data["data_storage"]))
+    if data.get("authentication"):
+        lines.append(str(data["authentication"]))
+    if data.get("navigation"):
+        lines.append(str(data["navigation"]))
+    if data.get("no_backend"):
+        lines.append("No cloud backend for the first version.")
+    return lines[:4]
+
+
 def reconcile_plan_with_intent(
     plan: dict[str, Any],
     intent: dict,

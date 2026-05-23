@@ -11,7 +11,9 @@ from core.app_name_suggester import suggest_app_name
 from core.plan_editor import apply_patch
 from core.plan_ids import normalize_plan_ids
 from core.plan_profile import (
+    assumptions_from_clarifications,
     enrich_intent_for_planners,
+    filter_user_facing_assumptions,
     is_local_first_plan,
     reconcile_plan_with_intent,
 )
@@ -24,6 +26,7 @@ from agents.assumption_generator import generate_assumptions
 from agents.feature_planner       import plan_features
 from agents.screen_planner        import plan_screens
 from agents.navigation_planner    import plan_navigation
+from agents.flow_planner          import plan_user_flows
 from agents.backend_planner       import plan_backend
 from agents.database_planner      import plan_database
 from agents.architecture_planner  import plan_architecture, plan_design_system
@@ -101,11 +104,21 @@ def _wants_suggested_name(answer: str) -> bool:
     return any(term in normalized for term in suggestion_terms)
 
 
-def _store_validation(plan: MasterPlan, validation: dict) -> None:
+def _store_validation(
+    plan: MasterPlan,
+    validation: dict,
+    clarifications: dict | None = None,
+) -> None:
     plan.validation_passed   = validation["validation_passed"]
     plan.confidence_score    = validation["confidence_score"]
     plan.missing_info        = validation["missing_info"]
-    plan.assumptions_made    = validation["assumptions_made"]
+    assumptions = filter_user_facing_assumptions(
+        validation.get("assumptions_made", []),
+        plan.to_dict(),
+    )
+    if not assumptions:
+        assumptions = assumptions_from_clarifications(clarifications)
+    plan.assumptions_made    = assumptions
     plan.ai_notes            = validation["ai_notes"]
     plan.validation_warnings = validation["validation_warnings"]
 
@@ -236,7 +249,7 @@ def _validate_and_repair(
     MAX_VALIDATION_REPAIR_ATTEMPTS times.
     """
     validation = _run_required_stage("Plan Validation", validate_plan, plan.to_dict())
-    _store_validation(plan, validation)
+    _store_validation(plan, validation, clarifications)
 
     for attempt in range(1, config.MAX_VALIDATION_REPAIR_ATTEMPTS + 1):
         if plan.validation_passed:
@@ -278,7 +291,7 @@ def _validate_and_repair(
             break
 
         _apply_plan_patches(plan, repair_result)
-        _enforce_firebase_plan(plan)
+        _apply_plan_profile(plan, intent, clarifications, user_prompt)
 
         if config.VERBOSE:
             summary = repair_result.get("summary", "Applied validation repair patches.")
@@ -290,7 +303,7 @@ def _validate_and_repair(
             validate_plan,
             plan.to_dict(),
         )
-        _store_validation(plan, validation)
+        _store_validation(plan, validation, clarifications)
 
     if not plan.validation_passed:
         # Check if only suggestions remain — these don't block the plan
@@ -410,6 +423,17 @@ def run_planning_pipeline(
     # ── Stage 5: Navigation ──────────────────────────────────
     _separator("Navigation Planning")
     plan.navigation = _run_required_stage("Navigation Planning", plan_navigation, intent, screens_data)
+
+    # ── Stage 5b: User flows ───────────────────────────────────
+    _separator("User Flow Planning")
+    flows_data = _run_required_stage(
+        "User Flow Planning",
+        plan_user_flows,
+        intent,
+        screens_data,
+        plan.navigation,
+    )
+    plan.user_flows = flows_data.get("user_flows", [])
 
     # ── Stage 6: Backend ─────────────────────────────────────
     _separator("Backend Planning")

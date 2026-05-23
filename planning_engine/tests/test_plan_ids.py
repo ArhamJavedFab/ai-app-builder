@@ -79,6 +79,11 @@ class TestPlanIds(unittest.TestCase):
         index = build_id_index(plan)
         self.assertTrue(len(index.get("screens", [])) >= 2)
 
+    def test_screen_id_is_first_key(self):
+        plan = normalize_plan_ids(copy.deepcopy(SAMPLE))
+        for screen in plan["screens"]:
+            self.assertEqual(list(screen.keys())[0], "id")
+
 
 if __name__ == "__main__":
     unittest.main()

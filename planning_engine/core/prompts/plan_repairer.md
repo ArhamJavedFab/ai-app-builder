@@ -31,8 +31,10 @@ REPAIR RULES:
 2. If `data_tier` is `local_only` (or `backend.needs_backend` is false):
    - Set `backend.auth_provider` to `"none"`, `backend.needs_backend` to false, `backend.backend_type` to `"local"`.
    - Set `backend.firebase_services` to `[]`, `backend.api_endpoints` to `[]`.
-   - Do NOT add LoginScreen — local gallery apps have no auth.
-   - Set `flutter_architecture.network_layer` to `"device_storage"` and `local_database` to `"device_gallery"`.
+   - Do NOT add LoginScreen unless auth is required.
+   - Set `network_layer` to `"device_storage"` and `local_database` to match `storage_profile`:
+     alarm/notes → `"isar"`, tasks/generic → `"hive"`, media → `"device_gallery"`.
+   - Remove gallery/photo security_rules unless storage_profile is media.
    - Missing IDs: use `target` patches (see below), not `/screens/N/id` paths.
 3. If `data_tier` is `firebase` (cloud app):
    - For non-Firebase backend/auth → set `backend_type` to `"firebase"`, `auth_provider` to `"firebase_auth"`, `api_endpoints` to `[]`.

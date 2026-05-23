@@ -231,7 +231,14 @@ def edit_plan(plan: dict[str, Any], instruction: str) -> tuple[dict[str, Any], d
     updated["validation_passed"] = validation["validation_passed"]
     updated["confidence_score"] = validation["confidence_score"]
     updated["missing_info"] = validation["missing_info"]
-    updated["assumptions_made"] = validation["assumptions_made"]
+    from core.plan_profile import (
+        assumptions_from_clarifications,
+        filter_user_facing_assumptions,
+    )
+    updated["assumptions_made"] = filter_user_facing_assumptions(
+        validation.get("assumptions_made", []),
+        updated,
+    ) or assumptions_from_clarifications({})
     updated["ai_notes"] = validation["ai_notes"]
     updated["validation_warnings"] = validation["validation_warnings"]
 

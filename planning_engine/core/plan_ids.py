@@ -136,6 +136,15 @@ def build_id_index(plan: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
             "name": table.get("name", ""),
         })
 
+    for flow in plan.get("user_flows", []):
+        if not isinstance(flow, dict):
+            continue
+        index.setdefault("user_flows", []).append({
+            "id": flow.get("id", ""),
+            "name": flow.get("name", ""),
+            "steps": flow.get("steps", []),
+        })
+
     return index
 
 
@@ -202,6 +211,48 @@ def _link_feature_refs(plan: dict[str, Any], feat_by_name: dict[str, str]) -> No
                 item["depends_on_ids"] = [
                     feat_by_name[n] for n in names if isinstance(n, str) and n in feat_by_name
                 ]
+
+
+def _order_id_first(obj: Any) -> Any:
+    """Put ``id`` first in every dict (and recurse into nested structures)."""
+    if isinstance(obj, dict):
+        ordered: dict[str, Any] = {}
+        if "id" in obj:
+            ordered["id"] = obj["id"]
+        for key, value in obj.items():
+            if key == "id":
+                continue
+            ordered[key] = _order_id_first(value)
+        return ordered
+    if isinstance(obj, list):
+        return [_order_id_first(item) for item in obj]
+    return obj
+
+
+def _link_flow_refs(
+    plan: dict[str, Any],
+    screen_by_name: dict[str, str],
+    screen_by_route: dict[str, str],
+) -> None:
+    for flow in plan.get("user_flows", []):
+        if not isinstance(flow, dict):
+            continue
+        steps = flow.get("steps") or []
+        if not steps or flow.get("step_screen_ids"):
+            continue
+        screen_ids: list[str] = []
+        for step in steps:
+            if not isinstance(step, str):
+                continue
+            sid = ""
+            if step.startswith("/"):
+                sid = screen_by_route.get(step, "")
+            else:
+                sid = screen_by_name.get(step, "")
+            if sid:
+                screen_ids.append(sid)
+        if screen_ids:
+            flow["step_screen_ids"] = screen_ids
 
 
 def _assign_reusable_components(plan: dict[str, Any], used: set[str], screen_by_name: dict[str, str]) -> None:
@@ -306,6 +357,8 @@ def normalize_plan_ids(plan: dict[str, Any], *, touch_updated_at: bool = True) -
             continue
         _ensure_id(flow, PREFIX_FLOW, used, seed=flow.get("name"))
 
+    _link_flow_refs(normalized, screen_by_name, screen_by_route)
+
     # ── Dependencies & third-party ────────────────────────────
     for dep in normalized.get("flutter_dependencies", []):
         if isinstance(dep, dict):
@@ -325,7 +378,7 @@ def normalize_plan_ids(plan: dict[str, Any], *, touch_updated_at: bool = True) -
     if touch_updated_at:
         normalized["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    return normalized
+    return _order_id_first(normalized)
 
 
 def resolve_patch_path(plan: dict[str, Any], patch: dict[str, Any]) -> str:
