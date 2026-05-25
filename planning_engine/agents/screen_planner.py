@@ -6,6 +6,7 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.navigation_contract import rewrite_root_route_to_home
 from core.prompt_loader import load_prompt_template
 import config
 
@@ -33,6 +34,9 @@ def plan_screens(intent: dict, features: dict) -> dict:
     if intent.get("data_tier") == "local_only":
         prompt = f"{prompt}\n\n{LOCAL_SCREEN_RULES}"
     result = call_gemini_json(prompt, use_pro=False)
+    screens = result.get("screens", [])
+    if isinstance(screens, list):
+        rewrite_root_route_to_home([s for s in screens if isinstance(s, dict)])
 
     if config.VERBOSE:
         screens    = len(result.get("screens", []))

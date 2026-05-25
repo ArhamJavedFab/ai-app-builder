@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arham Javed | Portfolio</title>
+  <meta name="description" content="Portfolio website for Arham Javed, showcasing projects, research, case studies, and skills." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root{
+      --bg:#07111f;
+      --bg2:#0b1730;
+      --card:rgba(10,18,35,.6);
+      --text:#eaf0ff;
+      --muted:#9db0d0;
+      --line:rgba(255,255,255,.1);
+      --accent:#66e3ff;
+      --accent2:#7c7cff;
+      --shadow:0 24px 80px rgba(0,0,0,.35);
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,sans-serif;
+      background:radial-gradient(circle at top,#12264a 0,#07111f 35%,#04070f 100%);
+      color:var(--text);
+      overflow-x:hidden;
+    }
+
+    a{color:inherit;text-decoration:none}
+    button{font:inherit}
+
+    .skip-link{
+      position:absolute;
+      left:-999px;
+      top:12px;
+      background:#fff;
+      color:#000;
+      padding:.75rem 1rem;
+      border-radius:999px;
+      z-index:9999;
+    }
+    .skip-link:focus{left:12px}
+
+    .site-header{
+      position:sticky;
+      top:0;
+      z-index:1000;
+      backdrop-filter:blur(16px);
+      background:rgba(5,10,20,.55);
+      border-bottom:1px solid var(--line);
+    }
+
+    .header-inner{
+      max-width:1400px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1rem;
+      padding:1rem 1.25rem;
+    }
+
+    .brand{
+      font-size:1.3rem;
+      font-weight:800;
+      letter-spacing:.04em;
+      white-space:nowrap;
+    }
+
+    .nav{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:.95rem;
+    }
+
+    .nav a{
+      font-size:.92rem;
+      color:var(--muted);
+      padding:.45rem .6rem;
+      border-radius:999px;
+      transition:.2s;
+    }
+
+    .nav a:hover,
+    .nav a:focus-visible{
+      color:#fff;
+      background:rgba(255,255,255,.08);
+      outline:none;
+    }
+
+    .cv-btn{
+      position:relative;
+      overflow:hidden;
+      border:0;
+      border-radius:999px;
+      padding:.95rem 1.2rem;
+      background:linear-gradient(135deg,#1ae3ff,#6f7cff);
+      color:#04101d;
+      font-weight:800;
+      cursor:pointer;
+      box-shadow:var(--shadow);
+      isolation:isolate;
+      white-space:nowrap;
+    }
+
+    .cv-btn::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:radial-gradient(circle at center,rgba(255,255,255,.95) 0,rgba(255,255,255,.65) 18%,rgba(255,255,255,.15) 35%,transparent 60%);
+      transform:scale(0);
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .cv-btn.rippling::after{
+      animation:ripple .65s ease-out;
+    }
+
+    .cv-btn:hover{
+      transform:translateY(-1px);
+    }
+
+    @keyframes ripple{
+      0%{transform:scale(0);opacity:.9}
+      100%{transform:scale(4);opacity:0}
+    }
+
+    .hero{
+      min-height:100svh;
+      display:grid;
+      place-items:center;
+      padding:8rem 1.25rem 3rem;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .hero-shell{
+      max-width:1200px;
+      width:100%;
+      position:relative;
+      isolation:isolate;
+    }
+
+    .hero-orbit{
+      position:absolute;
+      inset:50% auto auto 50%;
+      width:min(72vw,680px);
+      aspect-ratio:1;
+      border-radius:50%;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      filter:drop-shadow(0 0 40px rgba(102,227,255,.12));
+    }
+
+    .orbit-core,
+    .orbit-icon{
+      position:absolute;
+      left:50%;
+      top:50%;
+      transform:translate(-50%,-50%);
+    }
+
+    .orbit-core{
+      width:14px;
+      height:14px;
+      border-radius:50%;
+      background:var(--accent);
+      box-shadow:0 0 30px rgba(102,227,255,.9);
+    }
+
+    .orbit-icon{
+      width:78px;
+      height:78px;
+      border-radius:22px;
+      display:grid;
+      place-items:center;
+      background:rgba(8,14,27,.65);
+      border:1px solid rgba(255,255,255,.08);
+      backdrop-filter:blur(10px);
+      box-shadow:0 12px 30px rgba(0,0,0,.24);
+      color:var(--text);
+      font-size:1.45rem;
+      will-change:transform,opacity,filter;
+    }
+
+    .orbit-icon span{
+      display:block;
+      font-size:.66rem;
+      margin-top:.3rem;
+      color:var(--muted);
+      font-weight:600;
+      text-align:center;
+      line-height:1.1;
+    }
+
+    .hero-content{
+      position:relative;
+      z-index:2;
+      max-width:760px;
+      will-change:transform,opacity,filter;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      padding:.45rem .8rem;
+      border:1px solid rgba(102,227,255,.22);
+      background:rgba(102,227,255,.08);
+      border-radius:999px;
+      color:#dffcff;
+      font-size:.84rem;
+      letter-spacing:.04em;
+      margin-bottom:1rem;
+    }
+
+    .badge i{color:var(--accent)}
+
+    h1{
+      margin:0;
+      font-size:clamp(3rem,8vw,6.8rem);
+      line-height:.94;
+      letter-spacing:-.05em;
+    }
+
+    .role{
+      margin:1rem 0 0;
+      font-size:clamp(1.1rem,2vw,1.5rem);
+      font-weight:600;
+      color:#d9e5ff;
+    }
+
+    .role strong{color:var(--accent)}
+
+    .hero-copy{
+      max-width:620px;
+      margin:1.1rem 0 0;
+      color:var(--muted);
+      font-size:1.02rem;
+      line-height:1.75;
+    }
+
+    .hero-actions{
+      display:flex;
+      gap:1rem;
+      flex-wrap:wrap;
+      margin-top:1.8rem;
+    }
+
+    .btn{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      padding:.95rem 1.25rem;
+      min-width:155px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:.5rem;
+      transition:.25s ease;
+    }
+
+    .btn-primary{
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#04101d;
+      font-weight:800;
+    }
+
+    .btn-secondary{
+      background:rgba(255,255,255,.04);
+      color:#fff;
+    }
+
+    .btn:hover,
+    .btn:focus-visible{
+      transform:translateY(-2px) scale(1.02);
+      box-shadow:0 18px 36px rgba(0,0,0,.25);
+      outline:none;
+    }
+
+    .hero-footer{
+      margin-top:1.4rem;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+
+    @media (max-width: 900px){
+      .header-inner{flex-direction:column}
+      .nav{justify-content:flex-start}
+      .hero{padding-top:10rem}
+      .hero-orbit{width:min(92vw,560px)}
+    }
+
+    @media (max-width: 640px){
+      .header-inner{gap:.85rem}
+      .nav{gap:.55rem}
+      .nav a{font-size:.84rem}
+      .cv-btn{width:100%}
+      .hero-actions{width:100%}
+      .btn{flex:1 1 100%}
+      .orbit-icon{
+        width:62px;
+        height:62px;
+        border-radius:18px;
+        font-size:1.15rem;
+      }
+      .orbit-icon span{display:none}
+      .hero-copy{font-size:.98rem}
+      .role{font-size:1.08rem}
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      *{
+        scroll-behavior:auto;
+        animation:none!important;
+        transition:none!important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#home">Skip to content</a>
+
+  <header class="site-header" aria-label="Primary header">
+    <div class="header-inner">
+      <div class="brand" aria-label="Arham">Arham</div>
+
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#skills">Skills</a>
+        <a href="#projects">Projects</a>
+        <a href="#research">Research</a>
+        <a href="#cases">Case Studies</a>
+        <a href="#blogs">Blogs</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <button class="cv-btn" id="cvBtn" type="button" aria-label="Download CV">Download CV</button>
+    </div>
+  </header>
+
+  <main id="home">
+    <section class="hero" aria-label="Hero section">
+      <div class="hero-shell">
+        <div class="hero-orbit" aria-hidden="true" id="orbitWrap">
+          <div class="orbit-core"></div>
+        </div>
+
+        <div class="hero-content" id="heroContent">
+          <div class="badge"><i class="fa-solid fa-sparkles"></i> Open to work</div>
+          <h1>Arham Javed</h1>
+          <p class="role">I am an <strong id="typedRole">AI Engineer</strong></p>
+          <p class="hero-copy">
+            I build practical digital products that mix strong design, reliable code, and useful automation.
+            My work focuses on AI, machine learning, and modern web experiences that feel fast and easy to use.
+            I like turning complex ideas into clear, polished interfaces.
+            The goal is always simple: create technology that helps people do better work, faster.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#projects">View Project</a>
+            <a class="btn btn-secondary" href="#contact">Contact me</a>
+          </div>
+          <p class="hero-footer">
+            Scroll down to see the skill orbit scale and fade the hero content with smooth GSAP motion.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <a id="about" class="sr-only">About section placeholder</a>
+  <a id="skills" class="sr-only">Skills section placeholder</a>
+  <a id="projects" class="sr-only">Projects section placeholder</a>
+  <a id="research" class="sr-only">Research section placeholder</a>
+  <a id="cases" class="sr-only">Case studies section placeholder</a>
+  <a id="blogs" class="sr-only">Blogs section placeholder</a>
+  <a id="contact" class="sr-only">Contact section placeholder</a>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    const roles = ['AI Engineer','ML Engineer','Gen AI Engineer','AI Automation Developer','Web Developer'];
+    const typedRole = document.getElementById('typedRole');
+    let roleIndex = 0;
+    let charIndex = 0;
+    let deleting = false;
+    const typeSpeed = 90, deleteSpeed = 48, pause = 900;
+
+    function tick(){
+      const current = roles[roleIndex];
+      if(!deleting){
+        charIndex++;
+        typedRole.textContent = current.slice(0,charIndex);
+        if(charIndex === current.length){
+          deleting = true;
+          setTimeout(tick,pause);
+          return;
+        }
+        setTimeout(tick,typeSpeed);
+      } else {
+        charIndex--;
+        typedRole.textContent = current.slice(0,charIndex);
+        if(charIndex === 0){
+          deleting = false;
+          roleIndex = (roleIndex + 1) % roles.length;
+          setTimeout(tick,220);
+          return;
+        }
+        setTimeout(tick,deleteSpeed);
+      }
+    }
+    tick();
+
+    const orbitWrap = document.getElementById('orbitWrap');
+    const skillData = [
+      ['Python','fa-brands fa-python'],
+      ['Machine Learning','fa-solid fa-diagram-project'],
+      ['Deep Learning','fa-solid fa-brain'],
+      ['TensorFlow','fa-solid fa-wave-square'],
+      ['PyTorch','fa-solid fa-fire'],
+      ['NLP','fa-solid fa-message'],
+      ['Computer Vision','fa-solid fa-eye'],
+      ['Web Development','fa-solid fa-code']
+    ];
+
+    const radius = 240;
+    skillData.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'orbit-icon';
+      el.style.transform =
+        `translate(-50%, -50%) rotate(${i * (360 / skillData.length)}deg) translate(${radius}px) rotate(${-i * (360 / skillData.length)}deg)`;
+      el.innerHTML = `<i class="${item[1]}" aria-hidden="true"></i><span>${item[0]}</span>`;
+      orbitWrap.appendChild(el);
+    });
+
+    gsap.to('.orbit-icon', {
+      rotation: 360,
+      duration: 26,
+      ease: 'none',
+      repeat: -1,
+      transformOrigin: '50% 50%'
+    });
+
+    const scrollTl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '.hero',
+        start: 'top top',
+        end: '+=120%',
+        scrub: 0.8,
+        invalidateOnRefresh: true
+      }
+    });
+
+    scrollTl
+      .to('.orbit-icon', { scale: 1.45, duration: 1, ease: 'none' }, 0)
+      .to('#heroContent', { opacity: 0.18, filter: 'blur(10px)', y: -36, duration: 1, ease: 'none' }, 0)
+      .to('.hero-copy, .hero-actions, .badge, .role, h1, .hero-footer', { opacity: 0.12, duration: 1, ease: 'none' }, 0);
+
+    const cvBtn = document.getElementById('cvBtn');
+    cvBtn.addEventListener('click', () => {
+      cvBtn.classList.remove('rippling');
+      void cvBtn.offsetWidth;
+      cvBtn.classList.add('rippling');
+
+      const blob = new Blob([
+        `Arham Javed
+Senior AI Engineer & Frontend Developer
+
+Portfolio CV placeholder file. Replace this text with the real CV before deployment.`
+      ], { type: 'text/plain;charset=utf-8' });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Arham-Javed-CV.txt';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  </script>
+</body>
+</html>

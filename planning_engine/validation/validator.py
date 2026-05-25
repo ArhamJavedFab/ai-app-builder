@@ -17,6 +17,7 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.navigation_contract import HOME_ROUTE, ROOT_ROUTE
 from core.plan_profile import is_local_first_plan
 from core.prompt_loader import load_prompt_template
 import config
@@ -158,6 +159,63 @@ def _rule_based_checks(plan: dict) -> list[dict]:
                 "critical", "screens",
                 f"Duplicate screen name: '{name}' appears {count} times.",
                 f"Rename one of the '{name}' screens to make all names unique.",
+            ))
+
+    # ── 1b. Navigation contract (codegen) ─────────────────────
+    for screen in screens:
+        if not isinstance(screen, dict):
+            continue
+        route = (screen.get("route") or "").strip()
+        if route == ROOT_ROUTE:
+            issues.append(_issue(
+                "critical", "navigation",
+                f"Screen '{screen.get('name','')}' uses forbidden route '/'.",
+                f"Set route to '{HOME_ROUTE}' for the home shell screen.",
+            ))
+
+    initial_route = (nav.get("initial_route") or "").strip()
+    if not initial_route:
+        issues.append(_issue(
+            "warning", "navigation",
+            "navigation.initial_route is missing.",
+            "Set initial_route (e.g. /splash or /home).",
+        ))
+    elif initial_route not in screen_routes:
+        issues.append(_issue(
+            "critical", "navigation",
+            f"initial_route '{initial_route}' is not defined on any screen.",
+            "Add a screen with that route or update initial_route.",
+        ))
+
+    valid_nav_paths = set(screen_routes) | routes
+    for redirect in nav.get("redirects") or []:
+        if not isinstance(redirect, dict):
+            continue
+        for key in ("from", "to"):
+            path = (redirect.get(key) or "").strip()
+            if not path:
+                issues.append(_issue(
+                    "warning", "navigation",
+                    f"Redirect entry is missing '{key}'.",
+                    "Each redirect needs from, when, and to.",
+                ))
+            elif path == ROOT_ROUTE:
+                issues.append(_issue(
+                    "critical", "navigation",
+                    f"Redirect '{key}' uses forbidden route '/'.",
+                    f"Use '{HOME_ROUTE}' instead of '/'.",
+                ))
+            elif path not in valid_nav_paths:
+                issues.append(_issue(
+                    "critical", "navigation",
+                    f"Redirect '{key}' path '{path}' is not a known screen route.",
+                    "Use only routes from screens[].route.",
+                ))
+        if not (redirect.get("when") or "").strip():
+            issues.append(_issue(
+                "warning", "navigation",
+                "Redirect is missing 'when' condition.",
+                "Set when (e.g. first_launch, permissions_granted).",
             ))
 
     # ── 2. Bottom-tab routes not in routes array ──────────────

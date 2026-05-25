@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from core.navigation_contract import apply_navigation_contract
+
 PLAN_VERSION = "1.1"
 
 PREFIX_SCREEN = "scr_"
@@ -374,6 +376,14 @@ def normalize_plan_ids(plan: dict[str, Any], *, touch_updated_at: bool = True) -
                 _ensure_id(api, PREFIX_EXT, used, seed=api.get("name"))
 
     _assign_reusable_components(normalized, used, screen_by_name)
+
+    normalized = apply_navigation_contract(normalized)
+
+    # Re-link after navigation contract may change routes.
+    screen_by_name = _map_by_key(normalized.get("screens", []), "name")
+    screen_by_route = _map_by_key(normalized.get("screens", []), "route")
+    _link_screen_refs(normalized, screen_by_name, screen_by_route)
+    _link_flow_refs(normalized, screen_by_name, screen_by_route)
 
     if touch_updated_at:
         normalized["updated_at"] = datetime.now(timezone.utc).isoformat()

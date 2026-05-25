@@ -56,6 +56,8 @@ class Screen:
 
 @dataclass
 class NavigationMap:
+    initial_route: str          = ""                  # e.g. /splash
+    redirects: list             = field(default_factory=list)  # {from, when, to}
     nav_type: str               = "bottom_navigation"  # bottom | drawer | tab | none
     bottom_tabs: list           = field(default_factory=list)
     routes: list                = field(default_factory=list)
@@ -63,6 +65,7 @@ class NavigationMap:
     guest_routes: list          = field(default_factory=list)
     deep_link_scheme: str       = ""
     nested_navigators: list     = field(default_factory=list)
+    navigation_package: str     = "go_router"
 
 
 @dataclass

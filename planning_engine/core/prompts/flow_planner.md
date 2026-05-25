@@ -35,7 +35,7 @@ RULES:
 - Every step must be a route path from the screens list — do not invent routes.
 - Use `priority`: `"mvp"` for flows required for the core experience; `"post_mvp"` for optional flows (share, delete, admin, etc.).
 - `trigger` describes what starts the flow (e.g. "User opens app for the first time", "User taps an image status card").
-- `steps` is an ordered list of route strings only (not screen names).
+- `steps` is an ordered list of route strings only (not screen names). Use `/home` for the main shell — never bare `/`.
 - Skip SplashScreen and ErrorScreen in steps unless they are essential to the journey.
 - For flows that branch (e.g. image vs video detail), create separate flows with clear names.
 

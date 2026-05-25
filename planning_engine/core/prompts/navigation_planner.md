@@ -30,9 +30,20 @@ CRITICAL RULES:
 - Every route in "bottom_tabs" must also exist in the "routes" array.
 - Do not invent routes that are not in the screen list.
 - protected_routes and guest_routes must only contain paths from the routes array.
+- NEVER use bare "/" — the app home shell must use "/home".
+- Set "initial_route" to the app entry screen (usually "/splash" if present, else "/home").
+- Provide "redirects" for splash/onboarding/permission flows when those screens exist.
 
 Return ONLY valid JSON:
 {{
+  "initial_route":   "<e.g. /splash>",
+  "redirects": [
+    {{
+      "from": "<route>",
+      "when": "<condition e.g. first_launch|permissions_granted|permissions_not_granted|ready>",
+      "to":   "<route>"
+    }}
+  ],
   "nav_type":        "<bottom_navigation|drawer|tab|none>",
   "bottom_tabs": [
     {{

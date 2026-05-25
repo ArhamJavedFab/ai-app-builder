@@ -6,6 +6,7 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.navigation_contract import finalize_navigation
 from core.prompt_loader import load_prompt_template
 import config
 
@@ -25,6 +26,11 @@ def plan_navigation(intent: dict, screens: dict) -> dict:
         screens_json=json.dumps(screens, indent=2),
     )
     result = call_gemini_json(filled, use_pro=False)
+    screens = screens.get("screens", []) if isinstance(screens, dict) else []
+    result = finalize_navigation(
+        [s for s in screens if isinstance(s, dict)],
+        result if isinstance(result, dict) else {},
+    )
 
     if config.VERBOSE:
         nav_type = result.get("nav_type", "unknown")

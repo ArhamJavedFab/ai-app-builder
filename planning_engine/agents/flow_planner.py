@@ -9,6 +9,7 @@ import json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.gemini_client import call_gemini_json
+from core.navigation_contract import HOME_ROUTE, ROOT_ROUTE
 from core.prompt_loader import load_prompt_template
 import config
 
@@ -64,7 +65,11 @@ def _fallback_user_flows(screens: list, navigation: dict) -> list[dict]:
         if r not in {"/splash", "/onboarding", "/permissions", "/login", "/signup", "/error"}
         and by_route.get(r, "").lower() not in _SKIP_SCREEN_NAMES
     ]
-    home = "/" if "/" in valid else (home_candidates[0] if home_candidates else "")
+    home = (
+        HOME_ROUTE
+        if HOME_ROUTE in valid
+        else (ROOT_ROUTE if ROOT_ROUTE in valid else (home_candidates[0] if home_candidates else ""))
+    )
 
     if len(onboarding_chain) >= 2 or (onboarding_chain and home):
         steps = list(onboarding_chain)

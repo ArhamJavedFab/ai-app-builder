@@ -35,6 +35,7 @@ Set api_calls to Firebase SDK actions such as "Firestore: read meals" or
 IMPORTANT RULES:
 - Every screen must have a unique name - never duplicate screen names.
 - Every screen must have a non-empty route path (e.g. /home, /product/:id).
+- NEVER use bare "/" as a route. The main shell / home screen MUST use route "/home".
 - Include an ErrorScreen with route /error.
 - Include a SplashScreen with route /splash.
 - If auth is needed, include a LoginScreen with route /login and SignupScreen with route /signup.
